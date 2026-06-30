@@ -1,0 +1,30 @@
+ignore_merge_commits = true
+branch_whitelist = ["master", "main"]
+skip_ci = "[skip ci]"
+
+generate_mono_repository_global_tag = true
+generate_mono_repository_package_tags = true
+monorepo_version_separator = "-"
+
+pre_bump_hooks = ["uv lock --no-upgrade"]
+
+post_bump_hooks = [
+    "git push",
+    "git push --tags",
+]
+
+[changelog]
+path = "CHANGELOG.md"
+template = "remote"
+remote = "github.com"
+owner = "shawndeng-homelab"
+repository = "trade-system"
+package_template = "remote"
+
+[packages.trade-system-core]
+path = "packages/trade-system-core"
+public_api = true
+changelog_path = "packages/trade-system-core/CHANGELOG.md"
+pre_bump_hooks = [
+    "uv version --package trade-system-core {{version}}",
+]

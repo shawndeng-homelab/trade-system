@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-venues-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/ef053b53a909f7670b2c51541662bd3850b9be67..trade-system-venues-0.1.1) - 2026-07-01
+#### Bug Fixes
+- include trade-system-venues in mkdocs API reference - ([ef053b5](https://github.com/shawndeng-homelab/trade-system/commit/ef053b53a909f7670b2c51541662bd3850b9be67)) - colyerdeng
+
+- - -
+
 ## [trade-system-venues-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/740f4dc1592ffa17e9cafa85a3eb672355fd8956..trade-system-venues-0.1.0) - 2026-07-01
 #### Features
 - scaffold trade-system-venues package for Binance/IBKR fee & financing - ([740f4dc](https://github.com/shawndeng-homelab/trade-system/commit/740f4dc1592ffa17e9cafa85a3eb672355fd8956)) - colyerdeng

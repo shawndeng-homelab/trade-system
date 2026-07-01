@@ -1,6 +1,6 @@
 [project]
 name = "trade-system-venues"
-version = "0.1.0"
+version = "0.1.1"
 description = "NautilusTrader venue fee and financing models (Binance, IBKR)"
 authors = [{name = "shawndeng", email = "shawndeng1109@qq.com"}]
 license = "MIT"

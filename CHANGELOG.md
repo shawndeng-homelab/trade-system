@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/5235a9240ae8ad090f6b59fde9f76ff36da2cfce..0.1.1) - 2026-07-01
+### Package updates
+- [trade-system-venues-0.1.1](packages/trade-system-venues) bumped to [trade-system-venues-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.1.0..trade-system-venues-0.1.1)
+### Global changes
+#### Bug Fixes
+- include trade-system-venues in mkdocs API reference - ([ef053b5](https://github.com/shawndeng-homelab/trade-system/commit/ef053b53a909f7670b2c51541662bd3850b9be67)) - colyerdeng
+- discover docs packages via --all-packages instead of hardcoded paths - ([5235a92](https://github.com/shawndeng-homelab/trade-system/commit/5235a9240ae8ad090f6b59fde9f76ff36da2cfce)) - colyerdeng
+
+- - -
+
 ## [0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/d1057379128154671e23317ff8e3269deb04b469..0.1.0) - 2026-07-01
 ### Package updates
 - [trade-system-venues](packages/trade-system-venues) bumped to [trade-system-venues-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-venues-0.1.0)

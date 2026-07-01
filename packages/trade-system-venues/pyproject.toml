@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12,<3.14.99"
 dependencies = [
-    "nautilus-trader~=1.230.0",
+    "nautilus-trader[ib]~=1.230.0",
 ]
 
 [build-system]

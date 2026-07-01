@@ -1,7 +1,7 @@
 """Tests for the IBKR catalog loader.
 
-These exercise only the import-safety and the ``NAUTILUS_PATH`` resolution; the download
-functions require a live TWS/Gateway and ``ibapi`` and are not unit-tested here.
+These exercise only import-safety and ``NAUTILUS_PATH`` resolution; the download
+functions require a live TWS/Gateway and are not unit-tested here.
 """
 
 import inspect
@@ -11,8 +11,8 @@ from nautilus_trader.persistence.catalog import ParquetDataCatalog
 from trade_system_venues.ibkr import catalog_loader
 
 
-def test_module_imports_without_ibapi():
-    """The module imports and exposes async download helpers without ibapi present."""
+def test_module_exposes_async_helpers():
+    """The module imports and exposes async download helpers."""
     assert inspect.iscoroutinefunction(catalog_loader.make_client)
     assert inspect.iscoroutinefunction(catalog_loader.download_stock_bars)
     assert inspect.iscoroutinefunction(catalog_loader.download_option_chain)

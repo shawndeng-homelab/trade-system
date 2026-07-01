@@ -21,11 +21,9 @@ from trade_system_venues.core.financing import FinancingSettlementActor
 class BinanceFundingConfig(FinancingConfig, frozen=True):
     """Configuration for ``BinanceFundingActor``.
 
-    Parameters
-    ----------
-    use_mark_price : bool, default True
-        Whether to value positions at the venue mark price (recommended) versus the
-        last trade price when computing the funding cashflow.
+    Args:
+        use_mark_price: Whether to value positions at the venue mark price (recommended)
+            versus the last trade price when computing the funding cashflow.
 
     """
 
@@ -35,10 +33,8 @@ class BinanceFundingConfig(FinancingConfig, frozen=True):
 class BinanceFundingActor(FinancingSettlementActor):
     """Settle Binance perpetual funding into the financing ledger.
 
-    Parameters
-    ----------
-    config : BinanceFundingConfig
-        The funding configuration.
+    Args:
+        config: The funding configuration.
 
     """
 

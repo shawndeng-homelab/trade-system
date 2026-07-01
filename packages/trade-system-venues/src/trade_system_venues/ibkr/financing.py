@@ -21,10 +21,8 @@ from trade_system_venues.core.financing import FinancingSettlementActor
 class IBKRFinancingConfig(FinancingConfig, frozen=True):
     """Configuration for ``IBKRFinancingActor``.
 
-    Parameters
-    ----------
-    day_count : int, default 360
-        Day-count denominator for annualized-rate accrual.
+    Args:
+        day_count: Day-count denominator for annualized-rate accrual.
 
     """
 
@@ -34,10 +32,8 @@ class IBKRFinancingConfig(FinancingConfig, frozen=True):
 class IBKRFinancingActor(FinancingSettlementActor):
     """Accrue IBKR margin interest and short-borrow fees into the financing ledger.
 
-    Parameters
-    ----------
-    config : IBKRFinancingConfig
-        The financing configuration.
+    Args:
+        config: The financing configuration.
 
     """
 

@@ -1,7 +1,6 @@
 """Scaffold smoke tests for the Binance fee model."""
 
 from nautilus_trader.backtest.models import FeeModel
-
 from trade_system_venues.binance.fee import BinanceFeeModel
 from trade_system_venues.binance.fee import BinanceFeeModelConfig
 

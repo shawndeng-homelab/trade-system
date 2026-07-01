@@ -1,7 +1,6 @@
 """Scaffold smoke tests for the IBKR fee model."""
 
 from nautilus_trader.backtest.models import FeeModel
-
 from trade_system_venues.ibkr.fee import IBKRFeeModel
 from trade_system_venues.ibkr.fee import IBKRFeeModelConfig
 

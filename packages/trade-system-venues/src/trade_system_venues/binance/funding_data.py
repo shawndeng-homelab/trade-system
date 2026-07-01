@@ -23,14 +23,11 @@ DEFAULT_FUNDING_INTERVAL_MINS = 8 * 60
 def mark_price_to_funding_rate(update: BinanceFuturesMarkPriceUpdate) -> FundingRateUpdate:
     """Convert a Binance mark-price update into a core ``FundingRateUpdate``.
 
-    Parameters
-    ----------
-    update : BinanceFuturesMarkPriceUpdate
-        The live mark-price update carrying the embedded funding rate.
+    Args:
+        update: The live mark-price update carrying the embedded funding rate.
 
-    Returns
-    -------
-    FundingRateUpdate
+    Returns:
+        The converted core funding-rate update.
 
     """
     raise NotImplementedError("mark_price_to_funding_rate is implemented in a later step")

@@ -23,7 +23,7 @@ from trade_system_venues.ibkr.schedule import TIERED
 class IBKRFeeModelConfig(FeeModelConfig, frozen=True):
     """Configuration for ``IBKRFeeModel``.
 
-    Args:
+    Attributes:
         pricing: One of ``"tiered"`` or ``"fixed"``.
         asset_class: Explicit asset-class override (``"stock"``, ``"future"``,
             ``"option"``, ``"forex"``). When ``None`` the class is inferred from the

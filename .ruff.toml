@@ -21,7 +21,8 @@ select = [
   "D",  # pydocstyle
   "UP",  # pyupgrade
   "RUF",  # Ruff-specific rules
-  "SIM"  # flake8-simplify
+  "SIM",  # flake8-simplify
+  "PLC0415"  # import should be at top-level of file
 ]
 
 [lint.isort]

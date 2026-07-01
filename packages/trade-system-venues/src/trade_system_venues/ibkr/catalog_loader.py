@@ -7,11 +7,7 @@ location"). Point every backtest at the same catalog and slice by instrument + t
 Requirements (runtime only):
 
 - A running **TWS** or **IB Gateway** the client can connect to.
-- The ``ibapi`` package (installed with NautilusTrader's ``interactive_brokers`` extra).
 - Appropriate IBKR market-data permissions for the instruments requested.
-
-The IBKR/``ibapi`` imports are performed lazily inside the functions so this module can
-be imported (and unit-tested) without ``ibapi`` or a live gateway present.
 
 Fixed location: by default the catalog is resolved from ``ParquetDataCatalog.from_env()``
 (the ``NAUTILUS_PATH`` environment variable → ``$NAUTILUS_PATH/catalog``). Set
@@ -41,14 +37,12 @@ asyncio.run(main())
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import Any
+import datetime as dt
 
+from ibapi.common import MarketDataTypeEnum
+from nautilus_trader.adapters.interactive_brokers.common import IBContract
+from nautilus_trader.adapters.interactive_brokers.historical.client import HistoricInteractiveBrokersClient
 from nautilus_trader.persistence.catalog import ParquetDataCatalog
-
-
-if TYPE_CHECKING:
-    import datetime as dt
 
 
 # IBKR options settle in the US on regular trading hours; default the download tz.
@@ -72,7 +66,7 @@ async def make_client(
     client_id: int = 5,
     delayed_data: bool = True,
     log_level: str = "INFO",
-) -> Any:
+) -> HistoricInteractiveBrokersClient:
     """Create and connect a ``HistoricInteractiveBrokersClient``.
 
     Args:
@@ -87,9 +81,6 @@ async def make_client(
         A connected ``HistoricInteractiveBrokersClient``.
 
     """
-    from ibapi.common import MarketDataTypeEnum
-    from nautilus_trader.adapters.interactive_brokers.historical.client import HistoricInteractiveBrokersClient
-
     market_data_type = MarketDataTypeEnum.DELAYED_FROZEN if delayed_data else MarketDataTypeEnum.REALTIME
     client = HistoricInteractiveBrokersClient(
         host=host,
@@ -103,7 +94,7 @@ async def make_client(
 
 
 async def download_stock_bars(
-    client: Any,
+    client: HistoricInteractiveBrokersClient,
     catalog: ParquetDataCatalog,
     *,
     instrument_ids: list[str],
@@ -144,7 +135,7 @@ async def download_stock_bars(
 
 
 async def download_option_chain(
-    client: Any,
+    client: HistoricInteractiveBrokersClient,
     catalog: ParquetDataCatalog,
     *,
     underlying: str,
@@ -168,8 +159,6 @@ async def download_option_chain(
         max_expiry_days: Latest expiry (days from now) to include.
 
     """
-    from nautilus_trader.adapters.interactive_brokers.common import IBContract
-
     chain_contract = IBContract(
         secType="STK",
         symbol=underlying,

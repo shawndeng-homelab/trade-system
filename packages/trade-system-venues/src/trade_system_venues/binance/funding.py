@@ -21,7 +21,7 @@ from trade_system_venues.core.financing import FinancingSettlementActor
 class BinanceFundingConfig(FinancingConfig, frozen=True):
     """Configuration for ``BinanceFundingActor``.
 
-    Args:
+    Attributes:
         use_mark_price: Whether to value positions at the venue mark price (recommended)
             versus the last trade price when computing the funding cashflow.
 

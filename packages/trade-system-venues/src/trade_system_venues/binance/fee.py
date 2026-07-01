@@ -26,7 +26,7 @@ from trade_system_venues.binance.schedule import USDT_FUTURES
 class BinanceFeeModelConfig(FeeModelConfig, frozen=True):
     """Configuration for ``BinanceFeeModel``.
 
-    Args:
+    Attributes:
         account_type: One of ``"spot"``, ``"usdt_futures"``, ``"coin_futures"``.
         vip_level: VIP tier used to look up maker/taker rates from the fee schedule.
         use_bnb_discount: Whether to apply the BNB fee discount (spot 25% / futures 10%).

@@ -20,7 +20,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: ["packages/trade-system-core/src"]
+          paths: ["packages/trade-system-core/src", "packages/trade-system-venues/src"]
           options:
             docstring_style: "google"
             show_source: true

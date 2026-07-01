@@ -25,7 +25,7 @@ from nautilus_trader.model.identifiers import InstrumentId
 class FinancingConfig(ActorConfig, frozen=True):
     """Base configuration for ``FinancingSettlementActor`` subclasses.
 
-    Args:
+    Attributes:
         instrument_ids: Instruments to settle financing for. When ``None`` the actor
             settles every instrument for which a position is held.
 

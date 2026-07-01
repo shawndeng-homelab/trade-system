@@ -21,7 +21,7 @@ from trade_system_venues.core.financing import FinancingSettlementActor
 class IBKRFinancingConfig(FinancingConfig, frozen=True):
     """Configuration for ``IBKRFinancingActor``.
 
-    Args:
+    Attributes:
         day_count: Day-count denominator for annualized-rate accrual.
 
     """

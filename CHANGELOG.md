@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/903be78759d59763afd73e52de1c3640da07aee8..0.2.0) - 2026-07-01
+### Package updates
+- [trade-system-venues-0.2.0](packages/trade-system-venues) bumped to [trade-system-venues-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.1.1..trade-system-venues-0.2.0)
+### Global changes
+#### Bug Fixes
+- default private PyPI publish URL to pypiserver.shawndeng.cc - ([d4be70c](https://github.com/shawndeng-homelab/trade-system/commit/d4be70c5087581f94f2376b863615107fdeec5cd)) - colyerdeng
+#### Refactoring
+- **(ibkr)** depend on nautilus-trader[ib], forbid in-function imports, document env - ([903be78](https://github.com/shawndeng-homelab/trade-system/commit/903be78759d59763afd73e52de1c3640da07aee8)) - colyerdeng
+
+- - -
+
 ## [0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/5235a9240ae8ad090f6b59fde9f76ff36da2cfce..0.1.1) - 2026-07-01
 ### Package updates
 - [trade-system-venues-0.1.1](packages/trade-system-venues) bumped to [trade-system-venues-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.1.0..trade-system-venues-0.1.1)

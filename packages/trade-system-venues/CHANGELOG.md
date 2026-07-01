@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-venues-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/03b16b594a3360a4a5de0e4e54a0af1e7226723a..trade-system-venues-0.2.0) - 2026-07-01
+#### Documentation
+- **(venues)** add usage examples and component status to README - ([2f04fd4](https://github.com/shawndeng-homelab/trade-system/commit/2f04fd4a2bcba28299d26a55998015514c27a191)) - colyerdeng
+#### Features
+- **(ibkr)** implement commission fee model and catalog data loader - ([03b16b5](https://github.com/shawndeng-homelab/trade-system/commit/03b16b594a3360a4a5de0e4e54a0af1e7226723a)) - colyerdeng
+#### Refactoring
+- **(ibkr)** depend on nautilus-trader[ib], forbid in-function imports, document env - ([903be78](https://github.com/shawndeng-homelab/trade-system/commit/903be78759d59763afd73e52de1c3640da07aee8)) - colyerdeng
+
+- - -
+
 ## [trade-system-venues-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/ef053b53a909f7670b2c51541662bd3850b9be67..trade-system-venues-0.1.1) - 2026-07-01
 #### Bug Fixes
 - include trade-system-venues in mkdocs API reference - ([ef053b5](https://github.com/shawndeng-homelab/trade-system/commit/ef053b53a909f7670b2c51541662bd3850b9be67)) - colyerdeng

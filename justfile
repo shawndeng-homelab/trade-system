@@ -50,15 +50,15 @@ test-version version:
 
 # Serve docs locally
 docs:
-    uv run --group docs mkdocs serve
+    uv run --all-packages --group docs mkdocs serve
 
 # Build static docs
 docs-build:
-    uv run --group docs mkdocs build
+    uv run --all-packages --group docs mkdocs build
 
 # Deploy docs to GitHub Pages
 deploy-gh-pages:
-    uv run --group docs mkdocs gh-deploy --force
+    uv run --all-packages --group docs mkdocs gh-deploy --force
 
 # Build sdist + wheel for every workspace package
 build:

@@ -26,18 +26,12 @@ from trade_system_venues.binance.schedule import USDT_FUTURES
 class BinanceFeeModelConfig(FeeModelConfig, frozen=True):
     """Configuration for ``BinanceFeeModel``.
 
-    Parameters
-    ----------
-    account_type : str, default "usdt_futures"
-        One of ``"spot"``, ``"usdt_futures"``, ``"coin_futures"``.
-    vip_level : int, default 0
-        VIP tier used to look up maker/taker rates from the fee schedule.
-    use_bnb_discount : bool, default False
-        Whether to apply the BNB fee discount (spot 25% / futures 10%).
-    maker_fee : str or None, default None
-        Explicit maker rate override (decimal fraction). Bypasses the tier table.
-    taker_fee : str or None, default None
-        Explicit taker rate override (decimal fraction). Bypasses the tier table.
+    Args:
+        account_type: One of ``"spot"``, ``"usdt_futures"``, ``"coin_futures"``.
+        vip_level: VIP tier used to look up maker/taker rates from the fee schedule.
+        use_bnb_discount: Whether to apply the BNB fee discount (spot 25% / futures 10%).
+        maker_fee: Explicit maker rate override (decimal fraction). Bypasses the tier table.
+        taker_fee: Explicit taker rate override (decimal fraction). Bypasses the tier table.
 
     """
 
@@ -51,14 +45,13 @@ class BinanceFeeModelConfig(FeeModelConfig, frozen=True):
 class BinanceFeeModel(FeeModel):
     """Binance maker/taker fee model with VIP tiers and BNB discounts.
 
-    Parameters
-    ----------
-    config : BinanceFeeModelConfig
-        The fee model configuration.
+    Args:
+        config: The fee model configuration.
 
     """
 
     def __init__(self, config: BinanceFeeModelConfig | None = None) -> None:
+        """Initialize the fee model, defaulting to USDⓈ-M VIP 0 when no config given."""
         self._config = config or BinanceFeeModelConfig()
 
     def _resolve_rate(self, liquidity_side: LiquiditySide) -> Decimal:

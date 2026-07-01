@@ -1,7 +1,6 @@
 """Scaffold smoke tests for the shared financing settlement machinery."""
 
 from nautilus_trader.common.actor import Actor
-
 from trade_system_venues.binance.funding import BinanceFundingActor
 from trade_system_venues.core.financing import FinancingSettlementActor
 from trade_system_venues.ibkr.financing import IBKRFinancingActor

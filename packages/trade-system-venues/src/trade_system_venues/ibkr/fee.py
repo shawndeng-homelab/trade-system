@@ -23,13 +23,11 @@ from trade_system_venues.ibkr.schedule import TIERED
 class IBKRFeeModelConfig(FeeModelConfig, frozen=True):
     """Configuration for ``IBKRFeeModel``.
 
-    Parameters
-    ----------
-    pricing : str, default "tiered"
-        One of ``"tiered"`` or ``"fixed"``.
-    asset_class : str or None, default None
-        Explicit asset-class override (``"stock"``, ``"future"``, ``"option"``,
-        ``"forex"``). When ``None`` the class is inferred from the instrument.
+    Args:
+        pricing: One of ``"tiered"`` or ``"fixed"``.
+        asset_class: Explicit asset-class override (``"stock"``, ``"future"``,
+            ``"option"``, ``"forex"``). When ``None`` the class is inferred from the
+            instrument.
 
     """
 
@@ -40,14 +38,13 @@ class IBKRFeeModelConfig(FeeModelConfig, frozen=True):
 class IBKRFeeModel(FeeModel):
     """IBKR commission model spanning stocks, futures, options, and forex.
 
-    Parameters
-    ----------
-    config : IBKRFeeModelConfig
-        The fee model configuration.
+    Args:
+        config: The fee model configuration.
 
     """
 
     def __init__(self, config: IBKRFeeModelConfig | None = None) -> None:
+        """Initialize the fee model, defaulting to tiered pricing when no config given."""
         self._config = config or IBKRFeeModelConfig()
 
     def _asset_class(self, instrument: Instrument) -> str:

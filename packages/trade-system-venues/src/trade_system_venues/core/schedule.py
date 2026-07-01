@@ -14,16 +14,12 @@ from decimal import Decimal
 def resolve_tier(thresholds: tuple[Decimal, ...], key: Decimal) -> int:
     """Return the index of the highest threshold that ``key`` reaches or exceeds.
 
-    Parameters
-    ----------
-    thresholds : tuple[Decimal, ...]
-        Ascending lower-bound thresholds for each tier (``thresholds[0]`` should be 0).
-    key : Decimal
-        The lookup value (for example a 30-day traded notional).
+    Args:
+        thresholds: Ascending lower-bound thresholds for each tier (``thresholds[0]``
+            should be 0).
+        key: The lookup value (for example a 30-day traded notional).
 
-    Returns
-    -------
-    int
+    Returns:
         The zero-based tier index.
 
     """

@@ -25,11 +25,9 @@ from nautilus_trader.model.identifiers import InstrumentId
 class FinancingConfig(ActorConfig, frozen=True):
     """Base configuration for ``FinancingSettlementActor`` subclasses.
 
-    Parameters
-    ----------
-    instrument_ids : list[str] or None, default None
-        Instruments to settle financing for. When ``None`` the actor settles every
-        instrument for which a position is held.
+    Args:
+        instrument_ids: Instruments to settle financing for. When ``None`` the actor
+            settles every instrument for which a position is held.
 
     """
 
@@ -39,17 +37,12 @@ class FinancingConfig(ActorConfig, frozen=True):
 class FinancingEvent(Data):
     """A single settled financing cashflow, published for analysis and record-keeping.
 
-    Parameters
-    ----------
-    instrument_id : InstrumentId
-        The instrument the cashflow applies to.
-    amount : Decimal
-        The settled cashflow in the settlement currency. Positive is a credit to the
-        account, negative is a debit.
-    ts_event : int
-        UNIX timestamp (nanoseconds) of the settlement.
-    ts_init : int
-        UNIX timestamp (nanoseconds) when the object was initialized.
+    Args:
+        instrument_id: The instrument the cashflow applies to.
+        amount: The settled cashflow in the settlement currency. Positive is a credit
+            to the account, negative is a debit.
+        ts_event: UNIX timestamp (nanoseconds) of the settlement.
+        ts_init: UNIX timestamp (nanoseconds) when the object was initialized.
 
     """
 
@@ -60,6 +53,7 @@ class FinancingEvent(Data):
         ts_event: int,
         ts_init: int,
     ) -> None:
+        """Initialize a settled financing cashflow."""
         self.instrument_id = instrument_id
         self.amount = amount
         self._ts_event = ts_event
@@ -82,14 +76,13 @@ class FinancingSettlementActor(Actor):
     This base class owns the ledger, the settlement dispatch, and the ``FinancingEvent``
     publication. Subclasses implement the rate subscription and the per-position formula.
 
-    Parameters
-    ----------
-    config : FinancingConfig
-        The financing configuration.
+    Args:
+        config: The financing configuration.
 
     """
 
     def __init__(self, config: FinancingConfig) -> None:
+        """Initialize the settlement actor with an empty ledger."""
         super().__init__(config)
         self._ledger: dict[InstrumentId, Decimal] = {}
 
@@ -104,18 +97,12 @@ class FinancingSettlementActor(Actor):
     def _compute_cashflow(self, instrument_id: InstrumentId, rate: Decimal, ts_ns: int) -> Decimal:
         """Return the financing cashflow for one instrument at a settlement time.
 
-        Parameters
-        ----------
-        instrument_id : InstrumentId
-            The instrument to settle.
-        rate : Decimal
-            The applicable rate for this settlement period.
-        ts_ns : int
-            UNIX timestamp (nanoseconds) of the settlement.
+        Args:
+            instrument_id: The instrument to settle.
+            rate: The applicable rate for this settlement period.
+            ts_ns: UNIX timestamp (nanoseconds) of the settlement.
 
-        Returns
-        -------
-        Decimal
+        Returns:
             The cashflow (positive credit, negative debit).
 
         """

@@ -15,7 +15,7 @@ default:
 # Sync workspace deps and install pre-commit hooks
 init:
     uv tool install rust-just
-    uv sync --all-groups
+    uv sync --all-packages --all-groups
     uvx pre-commit install
 
 # Run ruff fix + format + check
@@ -42,11 +42,11 @@ test:
 
 # Run tests across the configured Python version range
 test-all:
-    uv run python -c "import subprocess; mn=int('{{python_min_version}}'.split('.')[1]); mx=int('{{python_max_version}}'.split('.')[1]); [subprocess.check_call(['uv','run','--all-groups','--python',f'3.{m}','pytest','--cov={{package_name}}','--cov-report=xml','--cov-report=term-missing','-v','packages/']) for m in range(mn, mx + 1)]"
+    uv run python -c "import subprocess; mn=int('{{python_min_version}}'.split('.')[1]); mx=int('{{python_max_version}}'.split('.')[1]); [subprocess.check_call(['uv','run','--all-packages','--all-groups','--python',f'3.{m}','pytest','--cov={{package_name}}','--cov-report=xml','--cov-report=term-missing','-v','packages/']) for m in range(mn, mx + 1)]"
 
 # Run tests for a specific Python version
 test-version version:
-    uv run --all-groups --python {{version}} pytest --cov={{package_name}} --cov-report=xml --cov-report=term-missing -v packages/
+    uv run --all-packages --all-groups --python {{version}} pytest --cov={{package_name}} --cov-report=xml --cov-report=term-missing -v packages/
 
 # Serve docs locally
 docs:

@@ -6,7 +6,7 @@ package_name := "trade_system_core"
 python_min_version := "3.12"
 python_max_version := "3.14"
 python_dev_version := python_min_version
-pypi_server_url := ""
+pypi_server_url := "https://pypiserver.shawndeng.cc"
 
 # Show available recipes
 default:

@@ -21,14 +21,19 @@ owner = "shawndeng-homelab"
 repository = "trade-system"
 package_template = "remote"
 
+# ── 子包(monorepo packages)配置 ──
+# 每个 [packages.<包名>] 声明一个受 cocogitto 跟踪的子包。
+# cocogitto 按 path 把每条提交归属到对应子包，据此分别计算版本号并打 tag；
+# 未在此注册的目录下的提交会被忽略(不会触发任何 bump)。
 [packages.trade-system-core]
-path = "packages/trade-system-core"
-public_api = true
-changelog_path = "packages/trade-system-core/CHANGELOG.md"
-pre_bump_hooks = [
-    "uv version --package trade-system-core {{version}}",
+path = "packages/trade-system-core"                        # 子包在仓库中的路径；cocogitto 按此路径把提交归属到本包
+public_api = true                                          # 本包版本变化是否计入 monorepo 全局版本(全局 tag)：true=计入
+changelog_path = "packages/trade-system-core/CHANGELOG.md" # 本包 CHANGELOG 的生成路径
+pre_bump_hooks = [                                         # bump 本包时、在创建 tag 之前执行的钩子命令
+    "uv version --package trade-system-core {{version}}",  # 用 uv 把算出的新版本号同步写回本包的 pyproject.toml
 ]
 
+# 字段含义同上(见 trade-system-core 的注释)
 [packages.trade-system-venues]
 path = "packages/trade-system-venues"
 public_api = true

@@ -9,7 +9,7 @@ The types here are deliberately engine-free plain Python so they can be unit-tes
 and reused in research notebooks.
 """
 
-from __future__ import annotations
+
 
 from dataclasses import dataclass
 from dataclasses import field

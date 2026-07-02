@@ -7,7 +7,7 @@ this model adds Binance VIP tiers, BNB discounts, and spot / USDⓈ-M / COIN-M h
 (including inverse-contract commission currency).
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

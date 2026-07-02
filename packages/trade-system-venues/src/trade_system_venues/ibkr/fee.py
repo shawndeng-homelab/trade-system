@@ -24,7 +24,7 @@ order at the rate of the tier it lands in, not marginally within an order). Orde
 straddling a month boundary or a partial fill across tiers are approximations.
 """
 
-from __future__ import annotations
+
 
 from datetime import UTC
 from datetime import datetime

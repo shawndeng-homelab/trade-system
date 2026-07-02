@@ -10,7 +10,7 @@ DTE, delta, price, and open-interest filters plus the delta-then-DTE sort — op
 on :class:`OptionCandidate` rows instead of live IBKR tickers.
 """
 
-from __future__ import annotations
+
 
 from dataclasses import dataclass
 from decimal import Decimal

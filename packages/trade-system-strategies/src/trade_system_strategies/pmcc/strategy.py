@@ -9,7 +9,7 @@ This is a scaffold: ``on_option_chain`` selects legs via
 is stubbed for incremental implementation.
 """
 
-from __future__ import annotations
+
 
 from nautilus_trader.model.data import Bar
 from nautilus_trader.trading.strategy import Strategy

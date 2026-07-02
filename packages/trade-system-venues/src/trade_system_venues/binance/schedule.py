@@ -12,7 +12,7 @@ Sources (verify and date-stamp when populating):
 TODO(step 2): populate the tier tables and BNB discount constants.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

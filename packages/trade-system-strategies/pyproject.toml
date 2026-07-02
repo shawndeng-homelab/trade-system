@@ -1,0 +1,30 @@
+[project]
+name = "trade-system-strategies"
+version = "0.1.0"
+description = "NautilusTrader trading strategies (PMCC, backspread) with shared tooling and Jupyter research"
+authors = [{name = "shawndeng", email = "shawndeng1109@qq.com"}]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12,<3.14.99"
+dependencies = [
+    "nautilus-trader[ib]~=1.230.0",
+    "polars~=1.0",
+    "trade-system-venues",
+]
+
+[project.optional-dependencies]
+research = [
+    "jupyterlab",
+    "matplotlib",
+    "plotly",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trade_system_strategies"]
+
+[tool.uv.sources]
+trade-system-venues = { workspace = true }

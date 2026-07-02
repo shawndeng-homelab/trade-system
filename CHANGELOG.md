@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/c66f7d81c16a4d426a51a9ddb59ea8c48b35b845..0.4.0) - 2026-07-02
+### Package updates
+- [trade-system-strategies](packages/trade-system-strategies) bumped to [trade-system-strategies-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-strategies-0.1.0)
+### Global changes
+#### Documentation
+- **(strategies)** explain option selection & roll/close core logic - ([c66f7d8](https://github.com/shawndeng-homelab/trade-system/commit/c66f7d81c16a4d426a51a9ddb59ea8c48b35b845)) - colyerdeng
+#### Features
+- **(strategies)** add trade-system-strategies package skeleton - ([7bf0cbd](https://github.com/shawndeng-homelab/trade-system/commit/7bf0cbd6f91e41fe4fa9d656e76658fb3ff622ae)) - colyerdeng
+
+- - -
+
 ## [0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/c46f6586223bd49a75379a3b99759a95cd639861..0.3.0) - 2026-07-02
 ### Package updates
 - [trade-system-venues-0.3.0](packages/trade-system-venues) bumped to [trade-system-venues-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.2.0..trade-system-venues-0.3.0)

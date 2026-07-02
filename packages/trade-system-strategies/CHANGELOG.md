@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-strategies-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/09b729e14de707bb9d0c9ff29e387e2a5bf95e8e..trade-system-strategies-0.1.1) - 2026-07-02
+#### Bug Fixes
+- **(strategies)** convert pmcc_research notebook to .ipynb to fix docs build - ([09b729e](https://github.com/shawndeng-homelab/trade-system/commit/09b729e14de707bb9d0c9ff29e387e2a5bf95e8e)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-strategies-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/7bf0cbd6f91e41fe4fa9d656e76658fb3ff622ae..trade-system-strategies-0.1.0) - 2026-07-02
 #### Documentation
 - **(strategies)** explain NautilusTrader strategy authoring in README - ([6a8cb18](https://github.com/shawndeng-homelab/trade-system/commit/6a8cb1843c79948b228e9e22e0b1a56ec64017e1)) - colyerdeng

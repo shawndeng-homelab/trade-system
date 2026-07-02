@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.4.1](https://github.com/shawndeng-homelab/trade-system/compare/0.4.0..0.4.1) - 1970-01-01
+### Package updates
+- [trade-system-strategies-0.1.1](packages/trade-system-strategies) bumped to [trade-system-strategies-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.1.0..trade-system-strategies-0.1.1)
+### Global changes
+
+- - -
+
 ## [0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/c66f7d81c16a4d426a51a9ddb59ea8c48b35b845..0.4.0) - 2026-07-02
 ### Package updates
 - [trade-system-strategies](packages/trade-system-strategies) bumped to [trade-system-strategies-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-strategies-0.1.0)

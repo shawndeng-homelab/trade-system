@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/c46f6586223bd49a75379a3b99759a95cd639861..0.3.0) - 2026-07-02
+### Package updates
+- [trade-system-venues-0.3.0](packages/trade-system-venues) bumped to [trade-system-venues-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.2.0..trade-system-venues-0.3.0)
+### Global changes
+#### Miscellaneous Chores
+- add scripts - ([c46f658](https://github.com/shawndeng-homelab/trade-system/commit/c46f6586223bd49a75379a3b99759a95cd639861)) - ShawnDeng-code
+
+- - -
+
 ## [0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/903be78759d59763afd73e52de1c3640da07aee8..0.2.0) - 2026-07-01
 ### Package updates
 - [trade-system-venues-0.2.0](packages/trade-system-venues) bumped to [trade-system-venues-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.1.1..trade-system-venues-0.2.0)

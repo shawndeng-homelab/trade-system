@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-venues-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/c65fe8e83bf17eafa66060b64f0fb6e9636f0f3d..trade-system-venues-0.3.0) - 2026-07-02
+#### Features
+- **(venues)** add IBKR tiered monthly-volume tiers to fee model - ([c65fe8e](https://github.com/shawndeng-homelab/trade-system/commit/c65fe8e83bf17eafa66060b64f0fb6e9636f0f3d)) - colyerdeng
+
+- - -
+
 ## [trade-system-venues-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/03b16b594a3360a4a5de0e4e54a0af1e7226723a..trade-system-venues-0.2.0) - 2026-07-01
 #### Documentation
 - **(venues)** add usage examples and component status to README - ([2f04fd4](https://github.com/shawndeng-homelab/trade-system/commit/2f04fd4a2bcba28299d26a55998015514c27a191)) - colyerdeng

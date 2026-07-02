@@ -5,7 +5,7 @@ from a large upside move. Scaffold: leg selection is in
 :mod:`~trade_system_strategies.backspread.signals`; submit/reconcile is stubbed.
 """
 
-from __future__ import annotations
+
 
 from nautilus_trader.model.data import Bar
 from nautilus_trader.trading.strategy import Strategy

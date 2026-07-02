@@ -8,7 +8,7 @@ daily on an annualized rate with a day-count convention. This reuses the shared
     cashflow = -(borrowed_or_short_value * annual_rate * days / day_count)
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

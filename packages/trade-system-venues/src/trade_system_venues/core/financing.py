@@ -12,7 +12,7 @@ Venue-specific subclasses provide the rate source and the settlement formula:
   short-borrow fees.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

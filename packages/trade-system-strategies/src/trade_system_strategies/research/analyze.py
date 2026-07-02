@@ -5,7 +5,7 @@ and plotting. Mirrors the selection logic used in backtests so a notebook valida
 exact legs a strategy would trade.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

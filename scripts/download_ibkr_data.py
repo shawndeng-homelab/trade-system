@@ -21,7 +21,7 @@ uv run --all-packages python scripts/download_ibkr_data.py
 ```
 """
 
-from __future__ import annotations
+
 
 import asyncio
 from dataclasses import dataclass

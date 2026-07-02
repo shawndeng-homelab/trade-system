@@ -4,7 +4,7 @@ Shared between :mod:`~trade_system_strategies.pmcc.strategy` and research notebo
 the selection used in a backtest is identical to the one explored in Jupyter.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

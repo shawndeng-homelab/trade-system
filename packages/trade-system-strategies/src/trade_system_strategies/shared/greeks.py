@@ -6,7 +6,7 @@ per-leg and portfolio greeks. The engine-coupled ``GreeksCalculator`` lives behi
 do not need an engine (leg-level Black-Scholes, delta lookup).
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

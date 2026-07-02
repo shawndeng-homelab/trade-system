@@ -8,7 +8,7 @@ Settles funding against open positions at each 8h funding boundary using the sha
 Longs pay when the rate is positive and receive when negative; shorts are the mirror.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

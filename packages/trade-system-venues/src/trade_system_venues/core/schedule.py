@@ -6,7 +6,7 @@ helpers resolve the row that applies to a given lookup key without pulling in a 
 dependency.
 """
 
-from __future__ import annotations
+
 
 from decimal import Decimal
 

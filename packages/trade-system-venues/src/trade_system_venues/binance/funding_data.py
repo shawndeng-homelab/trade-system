@@ -10,7 +10,7 @@ Two responsibilities:
   ``ParquetDataCatalog`` for backtests.
 """
 
-from __future__ import annotations
+
 
 from nautilus_trader.adapters.binance.futures.types import BinanceFuturesMarkPriceUpdate
 from nautilus_trader.model.data import FundingRateUpdate

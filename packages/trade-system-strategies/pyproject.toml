@@ -8,6 +8,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.14.99"
 dependencies = [
     "nautilus-trader[ib]~=1.230.0",
+    "plotly>=6.8.0",
     "polars~=1.0",
     "trade-system-venues",
 ]

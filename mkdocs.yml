@@ -8,6 +8,8 @@ repo_name: shawndeng-homelab/trade-system
 copyright: Maintained by <a href="https://github.com/shawndeng-homelab">shawndeng</a>.
 nav:
   - Home: index.md
+  - Strategies:
+      - Option management: strategies/option-management.md
   - API Reference: reference/
 plugins:
   - search

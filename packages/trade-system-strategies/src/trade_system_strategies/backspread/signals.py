@@ -1,7 +1,5 @@
 """Backspread-specific leg selection (pure functions)."""
 
-
-
 from decimal import Decimal
 
 from trade_system_strategies.backspread.config import BackspreadConfig

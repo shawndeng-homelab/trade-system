@@ -13,6 +13,8 @@ available, then consumes it. ``penalize`` drains the bucket and schedules a
 import asyncio
 import time
 
+from massive.exceptions import BadResponse
+
 
 class TokenBucketRateLimiter:
     """An async token-bucket rate limiter.
@@ -30,6 +32,7 @@ class TokenBucketRateLimiter:
     """
 
     def __init__(self, rate: float, burst: int, clock=None) -> None:
+        """Initialize the bucket full of tokens at the given refill rate."""
         if rate <= 0:
             raise ValueError(f"`rate` must be positive, was {rate}")
         if burst < 1:
@@ -121,3 +124,62 @@ class TokenBucketRateLimiter:
 def rate_per_min_to_per_sec(rate_per_min: float) -> float:
     """Convert a per-minute rate to a per-second rate."""
     return rate_per_min / 60.0
+
+
+async def rate_limited_call(
+    limiter: TokenBucketRateLimiter,
+    fn,
+    /,
+    *args,
+    max_retries: int = 3,
+    **kwargs,
+):
+    """Run a synchronous Massive ``RESTClient`` method under the rate limiter.
+
+    Acquires a token from `limiter`, then runs ``fn(*args, **kwargs)`` in a worker
+    thread (the Massive client is synchronous / urllib3-based). The Massive client
+    already retries ``429``/``5xx`` internally via ``urllib3.util.Retry``; a
+    :class:`massive.exceptions.BadResponse` here means those retries were exhausted.
+    Because ``BadResponse`` carries only the response body (no status code), we treat
+    any such failure as transient: inspect the body for a rate-limit hint and, when
+    found, schedule a limiter cooldown via :meth:`penalize`; then back off and retry up
+    to ``max_retries`` times.
+
+    Parameters
+    ----------
+    limiter : TokenBucketRateLimiter
+        The token-bucket limiter gating this adapter's REST traffic.
+    fn : callable
+        The synchronous Massive client method to call.
+    *args, **kwargs
+        Forwarded to ``fn``.
+    max_retries : int, default 3
+        The number of times to retry after a ``BadResponse`` before re-raising.
+
+    Returns:
+    -------
+    Any
+        Whatever ``fn`` returns.
+
+    Raises:
+    ------
+    BadResponse
+        If the call still fails after ``max_retries`` retries.
+
+    """
+    last_exc: BadResponse | None = None
+    for attempt in range(max_retries + 1):
+        await limiter.acquire()
+        try:
+            return await asyncio.to_thread(fn, *args, **kwargs)
+        except BadResponse as exc:
+            last_exc = exc
+            body = str(exc.args[0]) if exc.args else ""
+            if "rate limit" in body.lower() or "429" in body:
+                # Server says we are too fast: drain the bucket and cool down.
+                limiter.penalize(retry_after=2.0**attempt)
+            if attempt >= max_retries:
+                break
+            await asyncio.sleep(2.0**attempt)
+    assert last_exc is not None  # pragma: no cover - loop always sets it before break
+    raise last_exc

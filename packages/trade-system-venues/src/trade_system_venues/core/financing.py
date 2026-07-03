@@ -12,8 +12,6 @@ Venue-specific subclasses provide the rate source and the settlement formula:
   short-borrow fees.
 """
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.common.actor import Actor

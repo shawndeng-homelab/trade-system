@@ -7,8 +7,6 @@ Run:
     uv run --all-packages python scripts/backtest_rsi.py
 """
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.analysis.tearsheet import create_tearsheet

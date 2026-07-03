@@ -8,8 +8,6 @@ Settles funding against open positions at each 8h funding boundary using the sha
 Longs pay when the rate is positive and receive when negative; shorts are the mirror.
 """
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.model.identifiers import InstrumentId

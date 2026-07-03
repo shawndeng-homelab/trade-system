@@ -4,8 +4,6 @@ Shared between :mod:`~trade_system_strategies.pmcc.strategy` and research notebo
 the selection used in a backtest is identical to the one explored in Jupyter.
 """
 
-
-
 from decimal import Decimal
 
 from trade_system_strategies.pmcc.config import PMCCConfig

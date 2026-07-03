@@ -25,7 +25,6 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.identifiers import TradeId
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
-
 from trade_system_massive.common import first_nonzero
 from trade_system_massive.common import ms_to_ns
 
@@ -166,7 +165,7 @@ def parse_expiration_ns(expiration_date: Any) -> int:
         except ValueError:
             return 0
     # 20:00 UTC == 16:00 US/Eastern (approximate, ignores DST; good enough for v1).
-    dt_utc = dt.datetime(d.year, d.month, d.day, 20, 0, tzinfo=dt.timezone.utc)
+    dt_utc = dt.datetime(d.year, d.month, d.day, 20, 0, tzinfo=dt.UTC)
     return int(dt_utc.timestamp() * 1_000_000_000)
 
 

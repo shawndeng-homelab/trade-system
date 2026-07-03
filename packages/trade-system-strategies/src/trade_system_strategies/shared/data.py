@@ -5,8 +5,6 @@ notebooks share one path to the shared ``ParquetDataCatalog`` (rooted at
 ``$NAUTILUS_PATH``).
 """
 
-
-
 from trade_system_venues.ibkr import catalog_loader as _cl
 
 

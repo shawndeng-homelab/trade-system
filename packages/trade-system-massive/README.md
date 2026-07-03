@@ -17,6 +17,9 @@ accounts, and integrations continue to work unchanged.
 - [x] Configurable token-bucket rate limiter with HTTP 429 backoff
 - [ ] Real-time WebSocket streaming (stubbed for v2)
 
+> **Historical-only:** the `subscribe_*` / `unsubscribe_*` family raises
+> `NotImplementedError("... is planned for v2")`. Real-time streaming lands in v2.
+
 ## Installation
 
 This is a `uv` workspace package. From the `trade-system` root:

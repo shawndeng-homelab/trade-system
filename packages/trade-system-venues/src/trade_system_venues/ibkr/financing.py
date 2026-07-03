@@ -8,8 +8,6 @@ daily on an annualized rate with a day-count convention. This reuses the shared
     cashflow = -(borrowed_or_short_value * annual_rate * days / day_count)
 """
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.model.identifiers import InstrumentId

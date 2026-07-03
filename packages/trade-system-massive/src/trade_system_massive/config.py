@@ -39,6 +39,19 @@ class MassiveDataClientConfig(LiveDataClientConfig, frozen=True):
         The instrument IDs to load definitions for on start.
     options_underlyings : set[str], optional
         The equity underlyings whose option chains to preload on start.
+    futures_product_codes : set[str], optional
+        The futures product codes (e.g. ``{"ES", "CL", "ZN"}``) to treat as
+        futures. Required so bare futures tickers (e.g. ``ESZ4``) are dispatched
+        to the futures endpoints instead of the stock path; also preloaded on
+        start.
+    futures_asset_class_overrides : dict[str, str], optional
+        Per-product-code override of the Nautilus ``AssetClass`` enum *name*
+        (e.g. ``{"ES": "EQUITY", "6E": "FX", "ZN": "DEBT"}``). Products not
+        listed default to ``COMMODITY``.
+    futures_multipliers : dict[str, int], optional
+        Per-product-code contract multiplier (e.g. ``{"ES": 50, "CL": 1000}``).
+        Massive's contract endpoint does not expose the multiplier; unlisted
+        products default to 1.
 
     """
 
@@ -52,3 +65,6 @@ class MassiveDataClientConfig(LiveDataClientConfig, frozen=True):
     bars_timestamp_on_close: bool = True
     instrument_ids: list[InstrumentId] | None = None
     options_underlyings: set[str] | None = None
+    futures_product_codes: set[str] | None = None
+    futures_asset_class_overrides: dict[str, str] | None = None
+    futures_multipliers: dict[str, int] | None = None

@@ -32,12 +32,20 @@ from nautilus_trader.model.enums import PriceType
 from nautilus_trader.model.identifiers import ClientId
 
 from trade_system_massive.common import bar_type_to_aggs_params
+from trade_system_massive.common import bar_type_to_futures_resolution
 from trade_system_massive.common import date_to_str
+from trade_system_massive.common import futures_time_range_params
 from trade_system_massive.common import instrument_id_to_ticker
+from trade_system_massive.common import is_future_ticker
 from trade_system_massive.common import ns_to_ms
+from trade_system_massive.common import resolution_is_fixed_duration
 from trade_system_massive.constants import MASSIVE
 from trade_system_massive.instruments import MassiveInstrumentProvider
 from trade_system_massive.parsing import parse_bar
+from trade_system_massive.parsing import parse_futures_bar
+from trade_system_massive.parsing import parse_futures_quote_tick
+from trade_system_massive.parsing import parse_futures_snapshot_to_quote
+from trade_system_massive.parsing import parse_futures_trade_tick
 from trade_system_massive.parsing import parse_last_quote
 from trade_system_massive.parsing import parse_quote_tick
 from trade_system_massive.parsing import parse_trade_tick
@@ -114,6 +122,10 @@ class MassiveDataClient(LiveMarketDataClient):
 
     # ------------------------------------------------------------------ helpers
 
+    def _is_future(self, ticker: str) -> bool:
+        """Return whether `ticker` should be dispatched to the futures endpoints."""
+        return is_future_ticker(ticker, self._instrument_provider._config.futures_product_codes)
+
     def _time_range_params(self, request) -> dict:
         """Map a request's ns start/end to Massive ``timestamp_gte``/``timestamp_lte``.
 
@@ -133,21 +145,33 @@ class MassiveDataClient(LiveMarketDataClient):
     async def _request_trade_ticks(self, request: RequestTradeTicks) -> None:
         instrument_id = request.instrument_id
         ticker = instrument_id_to_ticker(instrument_id)
-        params = self._time_range_params(request)
+        is_future = self._is_future(ticker)
+        # Futures trades take nanosecond timestamps; stocks take milliseconds.
+        params = futures_time_range_params(request) if is_future else self._time_range_params(request)
         if request.limit:
             params["limit"] = request.limit
         try:
-            trades = await rate_limited_call(
-                self._rate_limiter,
-                self._client.list_trades,
-                ticker,
-                max_retries=self._max_retries,
-                **params,
-            )
+            if is_future:
+                trades = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_futures_trades,
+                    ticker,
+                    max_retries=self._max_retries,
+                    **params,
+                )
+                ticks = [parse_futures_trade_tick(instrument_id, t) for t in trades]
+            else:
+                trades = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_trades,
+                    ticker,
+                    max_retries=self._max_retries,
+                    **params,
+                )
+                ticks = [parse_trade_tick(instrument_id, t) for t in trades]
         except BadResponse as exc:
             self._log.error(f"Cannot request trade ticks for {instrument_id}: {exc}")
             return
-        ticks = [parse_trade_tick(instrument_id, t) for t in trades]
         self._handle_trade_ticks(
             instrument_id,
             ticks,
@@ -160,21 +184,33 @@ class MassiveDataClient(LiveMarketDataClient):
     async def _request_quote_ticks(self, request: RequestQuoteTicks) -> None:
         instrument_id = request.instrument_id
         ticker = instrument_id_to_ticker(instrument_id)
-        params = self._time_range_params(request)
+        is_future = self._is_future(ticker)
+        # Futures quotes take nanosecond timestamps; stocks take milliseconds.
+        params = futures_time_range_params(request) if is_future else self._time_range_params(request)
         if request.limit:
             params["limit"] = request.limit
         try:
-            quotes = await rate_limited_call(
-                self._rate_limiter,
-                self._client.list_quotes,
-                ticker,
-                max_retries=self._max_retries,
-                **params,
-            )
+            if is_future:
+                quotes = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_futures_quotes,
+                    ticker,
+                    max_retries=self._max_retries,
+                    **params,
+                )
+                ticks = [parse_futures_quote_tick(instrument_id, q) for q in quotes]
+            else:
+                quotes = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_quotes,
+                    ticker,
+                    max_retries=self._max_retries,
+                    **params,
+                )
+                ticks = [parse_quote_tick(instrument_id, q) for q in quotes]
         except BadResponse as exc:
             self._log.error(f"Cannot request quote ticks for {instrument_id}: {exc}")
             return
-        ticks = [parse_quote_tick(instrument_id, q) for q in quotes]
         self._handle_quote_ticks(
             instrument_id,
             ticks,
@@ -195,25 +231,49 @@ class MassiveDataClient(LiveMarketDataClient):
 
         instrument_id = bar_type.instrument_id
         ticker = instrument_id_to_ticker(instrument_id)
-        multiplier, timespan = bar_type_to_aggs_params(bar_type)
-        from_ = date_to_str(request.start)
-        to = date_to_str(request.end)
+        is_future = self._is_future(ticker)
         try:
-            aggs = await rate_limited_call(
-                self._rate_limiter,
-                self._client.list_aggs,
-                ticker,
-                multiplier,
-                timespan,
-                from_,
-                to,
-                max_retries=self._max_retries,
-                limit=self._pagination_limit,
-            )
+            if is_future:
+                resolution = bar_type_to_futures_resolution(bar_type)
+                # Futures aggs use `resolution` + `window_start` (ns); stocks use
+                # `multiplier`/`timespan` + `from_`/`to` (ms / YYYY-MM-DD).
+                params: dict = {"resolution": resolution, "limit": self._pagination_limit}
+                if request.start is not None:
+                    params["window_start_gte"] = int(request.start)
+                if request.end is not None:
+                    params["window_start_lte"] = int(request.end)
+                if self._bars_timestamp_on_close and not resolution_is_fixed_duration(resolution):
+                    self._log.warning(
+                        f"futures resolution {resolution!r} is non-fixed-duration; "
+                        f"bar timestamps will remain on open (window_start)",
+                    )
+                aggs = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_futures_aggregates,
+                    ticker,
+                    max_retries=self._max_retries,
+                    **params,
+                )
+                bars = [parse_futures_bar(bar_type, a, resolution, self._bars_timestamp_on_close) for a in aggs]
+            else:
+                multiplier, timespan = bar_type_to_aggs_params(bar_type)
+                from_ = date_to_str(request.start)
+                to = date_to_str(request.end)
+                aggs = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.list_aggs,
+                    ticker,
+                    multiplier,
+                    timespan,
+                    from_,
+                    to,
+                    max_retries=self._max_retries,
+                    limit=self._pagination_limit,
+                )
+                bars = [parse_bar(bar_type, a, multiplier, timespan, self._bars_timestamp_on_close) for a in aggs]
         except BadResponse as exc:
             self._log.error(f"Cannot request bars for {bar_type}: {exc}")
             return
-        bars = [parse_bar(bar_type, a, multiplier, timespan, self._bars_timestamp_on_close) for a in aggs]
         self._handle_bars(
             bar_type=bar_type,
             bars=bars,
@@ -259,20 +319,42 @@ class MassiveDataClient(LiveMarketDataClient):
         (a ``CLEAR`` followed by ``SET`` for the bid and ask) via the standard deltas
         callback. This is a v1 best-effort path; a full depth snapshot is TODO.
 
+        For futures, the snapshot comes from ``get_futures_snapshot`` (whose
+        ``last_quote`` sub-object); for stocks/options, from ``get_last_quote``.
+
         """
         instrument_id = request.instrument_id
         ticker = instrument_id_to_ticker(instrument_id)
+        is_future = self._is_future(ticker)
         try:
-            last_quote = await rate_limited_call(
-                self._rate_limiter,
-                self._client.get_last_quote,
-                ticker,
-                max_retries=self._max_retries,
-            )
+            if is_future:
+                snapshots = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.get_futures_snapshot,
+                    ticker=ticker,
+                    max_retries=self._max_retries,
+                )
+                # `get_futures_snapshot` returns an iterator; pick the matching ticker
+                # (defensive — the server-side `ticker=` filter should already scope it).
+                quote = None
+                for snap in snapshots:
+                    if getattr(snap, "ticker", None) == ticker:
+                        quote = parse_futures_snapshot_to_quote(instrument_id, snap)
+                        break
+            else:
+                last_quote = await rate_limited_call(
+                    self._rate_limiter,
+                    self._client.get_last_quote,
+                    ticker,
+                    max_retries=self._max_retries,
+                )
+                quote = parse_last_quote(instrument_id, last_quote)
         except BadResponse as exc:
             self._log.error(f"Cannot request order book snapshot for {instrument_id}: {exc}")
             return
-        quote = parse_last_quote(instrument_id, last_quote)
+        if quote is None:
+            self._log.error(f"No order book snapshot for {instrument_id}")
+            return
         ts = quote.ts_event
         # BookOrder requires Price/Quantity; reuse the parsed quote's values.
         bid_order = BookOrder(OrderSide.BUY, quote.bid_price, quote.bid_size, ts)

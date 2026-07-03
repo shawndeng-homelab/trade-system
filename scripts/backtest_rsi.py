@@ -25,7 +25,7 @@ from nautilus_trader.model.identifiers import TraderId
 # The catalog lives at the repo root (NAUTILUS_PATH points here; data/ holds the parquet).
 CATALOG_PATH = r"E:/TMP/trade-system"
 INSTRUMENT_ID = "SPY.ARCA"
-BAR_SPEC = "1-HOUR-LAST"
+BAR_SPEC = "1-MINUTE-LAST"
 START_TIME = "2026-01-02T00:00:00+00:00"
 END_TIME = "2026-06-30T00:00:00+00:00"
 

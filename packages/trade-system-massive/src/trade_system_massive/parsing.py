@@ -1,12 +1,13 @@
 """Conversions from Massive.com response models to Nautilus data objects.
 
 The Massive/Polygon client returns typed model objects (``Agg``, ``Trade``,
-``Quote``, ``LastTrade``, ``LastQuote``). These helpers convert them into the
-Nautilus ``TradeTick`` / ``QuoteTick`` / ``Bar`` types.
+``Quote``, ``LastTrade``, ``LastQuote``, and the futures ``FuturesTrade`` /
+``FuturesQuote`` / ``FuturesAgg`` / ``FuturesSnapshot``). These helpers convert
+them into the Nautilus ``TradeTick`` / ``QuoteTick`` / ``Bar`` types.
 
-All Massive timestamps are integers in nanoseconds **except** aggregate
+All Massive timestamps are integers in nanoseconds **except** stock aggregate
 timestamps, which are in milliseconds (a Polygon API convention); see
-``_agg_ts_to_ns``.
+``_agg_ts_to_ns``. Futures aggregates (``FuturesAgg.window_start``) are nanoseconds.
 
 The functions access attributes by name so unit tests can pass lightweight
 fakes (e.g. ``types.SimpleNamespace``) instead of real Massive models.
@@ -26,18 +27,20 @@ from nautilus_trader.model.identifiers import TradeId
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 
+from trade_system_massive.common import clamp_to_9dp
 from trade_system_massive.common import first_nonzero
 from trade_system_massive.common import ms_to_ns
+from trade_system_massive.common import resolution_duration_ns
 
 
 def _price(value: Any) -> Price:
     """Build a ``Price`` from a Massive numeric, preserving precision via ``str``."""
-    return Price.from_str(str(value))
+    return Price.from_str(clamp_to_9dp(value))
 
 
 def _size(value: Any) -> Quantity:
-    """Build a ``Quantity`` from a Massive numeric."""
-    return Quantity.from_str(str(value))
+    """Build a ``Quantity`` from a Massive numeric, clamped to Nautilus's 9-digit max."""
+    return Quantity.from_str(clamp_to_9dp(value))
 
 
 def _tick_ts(sip_ns: int, participant_ns: int) -> int:
@@ -175,3 +178,123 @@ def decimal_or_default(value: Any, default: Decimal) -> Decimal:
     if value is None or value == "":
         return default
     return Decimal(str(value))
+
+
+# --------------------------------------------------------------------------- futures
+
+
+def parse_date_to_start_ns(value: Any) -> int:
+    """Parse a ``YYYY-MM-DD`` (or ``date``) to UTC nanoseconds at 00:00 UTC.
+
+    Used for futures contract activation/expiration dates, which have no
+    intraday time component. Returns ``0`` if `value` cannot be parsed. This
+    differs from :func:`parse_expiration_ns` (equity options, 16:00 ET close)
+    because futures settlement timing varies by product and 00:00 UTC is the
+    safe neutral choice.
+
+    """
+    if not value:
+        return 0
+    if isinstance(value, dt.date):
+        d = value
+    else:
+        try:
+            d = dt.date.fromisoformat(str(value))
+        except ValueError:
+            return 0
+    dt_utc = dt.datetime(d.year, d.month, d.day, tzinfo=dt.UTC)
+    return int(dt_utc.timestamp() * 1_000_000_000)
+
+
+def parse_futures_trade_tick(instrument_id: InstrumentId, trade: Any) -> Any:
+    """Convert a Massive ``FuturesTrade`` to a Nautilus ``TradeTick``.
+
+    Futures trades carry a single nanosecond ``timestamp`` (no SIP/participant
+    split) and no trade id; the trade id falls back to ``sequence_number`` (then
+    ``report_sequence``) or ``"-1"``. Aggressor side is not reported by Massive.
+
+    """
+    ts = int(getattr(trade, "timestamp", 0) or 0)
+    size = getattr(trade, "size", 0)
+    seq = getattr(trade, "sequence_number", None) or getattr(trade, "report_sequence", None)
+    trade_id = TradeId(str(seq)) if seq else TradeId("-1")
+    return TradeTick(
+        instrument_id=instrument_id,
+        price=_price(trade.price),
+        size=_size(size),
+        aggressor_side=AggressorSide.NO_AGGRESSOR,
+        trade_id=trade_id,
+        ts_event=ts,
+        ts_init=ts,
+    )
+
+
+def parse_futures_quote_tick(instrument_id: InstrumentId, quote: Any) -> Any:
+    """Convert a Massive ``FuturesQuote`` to a Nautilus ``QuoteTick``.
+
+    Futures quotes carry a single nanosecond ``timestamp`` and use
+    ``bid_price``/``ask_price``/``bid_size``/``ask_size`` (same field names as
+    stock quotes, but no ``sip_timestamp``).
+
+    """
+    ts = int(getattr(quote, "timestamp", 0) or 0)
+    return QuoteTick(
+        instrument_id=instrument_id,
+        bid_price=_price(quote.bid_price),
+        ask_price=_price(quote.ask_price),
+        bid_size=_size(quote.bid_size),
+        ask_size=_size(quote.ask_size),
+        ts_event=ts,
+        ts_init=ts,
+    )
+
+
+def parse_futures_bar(bar_type: BarType, agg: Any, resolution: str, on_close: bool) -> Bar:
+    """Convert a Massive ``FuturesAgg`` to a Nautilus ``Bar``.
+
+    Futures aggregate ``window_start`` is in **nanoseconds** (unlike stock
+    ``Agg.timestamp`` which is milliseconds). For fixed-duration resolutions
+    (sec/min/hour) with ``on_close=True``, the bar timestamp advances to
+    ``window_start + duration``. For non-fixed resolutions (session/week/month/
+    quarter/year) the close cannot be computed from the open alone, so the
+    timestamp stays on ``window_start`` (open); the caller may log a warning.
+
+    """
+    open_ns = int(getattr(agg, "window_start", 0) or 0)
+    ts_event = open_ns
+    if on_close:
+        ts_event = open_ns + resolution_duration_ns(resolution)
+    return Bar(
+        bar_type=bar_type,
+        open=_price(agg.open),
+        high=_price(agg.high),
+        low=_price(agg.low),
+        close=_price(agg.close),
+        volume=_size(getattr(agg, "volume", 0) or 0),
+        ts_event=ts_event,
+        ts_init=ts_event,
+    )
+
+
+def parse_futures_snapshot_to_quote(instrument_id: InstrumentId, snapshot: Any) -> Any | None:
+    """Convert a Massive ``FuturesSnapshot``'s ``last_quote`` to a Nautilus ``QuoteTick``.
+
+    ``get_futures_snapshot`` returns an iterator of snapshots; the caller passes the
+    single matching snapshot. Its ``last_quote`` sub-object carries ``bid``/``ask``
+    (not ``bid_price``/``ask_price``), ``bid_size``/``ask_size``, and ``last_updated``
+    (ns). Returns ``None`` when the snapshot has no ``last_quote``.
+
+    """
+    lq = getattr(snapshot, "last_quote", None)
+    if lq is None:
+        return None
+    ts = int(getattr(lq, "last_updated", 0) or 0)
+    return QuoteTick(
+        instrument_id=instrument_id,
+        bid_price=_price(lq.bid),
+        ask_price=_price(lq.ask),
+        bid_size=_size(lq.bid_size),
+        ask_size=_size(lq.ask_size),
+        ts_event=ts,
+        ts_init=ts,
+    )

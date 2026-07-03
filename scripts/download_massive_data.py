@@ -31,6 +31,7 @@ uv run --all-packages python scripts/download_massive_data.py
 
 import asyncio
 import datetime as dt
+import os
 import time
 from dataclasses import dataclass
 
@@ -46,6 +47,7 @@ from nautilus_trader.model.identifiers import Symbol
 from nautilus_trader.model.identifiers import Venue
 from nautilus_trader.persistence.catalog import ParquetDataCatalog
 from trade_system_massive.common import bar_type_to_aggs_params
+from trade_system_massive.common import bar_type_to_futures_resolution
 from trade_system_massive.common import date_to_str
 from trade_system_massive.common import instrument_id_to_ticker
 from trade_system_massive.config import MassiveDataClientConfig
@@ -56,7 +58,10 @@ from trade_system_massive.factories import get_cached_massive_rate_limiter
 from trade_system_massive.factories import get_cached_massive_rest_client
 from trade_system_massive.factories import resolve_api_key
 from trade_system_massive.instruments import MassiveInstrumentProvider
+from trade_system_massive.instruments import MassiveInstrumentProviderConfig
 from trade_system_massive.parsing import parse_bar
+from trade_system_massive.parsing import parse_futures_bar
+from urllib3.exceptions import MaxRetryError
 
 
 # ======================================================================
@@ -72,7 +77,7 @@ class MassiveConn:
     base_url: str | None = None  # None → 默认 https://api.massive.com
     rate_limit_per_min: float = DEFAULT_RATE_LIMIT_PER_MIN  # 免费层 5；付费层可调高
     burst: int = DEFAULT_BURST  # 瞬时突发上限
-    max_retries: int = 3  # BadResponse(含 429) 退避重试次数
+    max_retries: int = 5  # BadResponse/MaxRetryError(含 429) 退避重试次数；429 需更多机会
     pagination_limit: int = 50_000  # 分页 page size（pagination=True 下控制每页大小）
     bars_timestamp_on_close: bool = True  # True=K线打 close 时间戳；False=打 open
     # 每页之间额外休眠秒数，给免费层配额留余量。0=不额外休眠。
@@ -83,12 +88,19 @@ class MassiveConn:
 
 @dataclass(frozen=True)
 class BarJob:
-    """A single stock/ETF instrument-definition and bars download job."""
+    """A single instrument-definition and bars download job (equity or futures).
 
-    instrument_id: InstrumentId  # 如 InstrumentId(Symbol("SPY"), Venue("ARCA"))
+    For equities/ETFs, leave ``futures_product_code`` as None. For futures, set it
+    to the Massive product code (e.g. ``"MES"``) so the provider dispatches the bare
+    ticker (``MESU5``) to the futures endpoints and applies the asset-class /
+    multiplier overrides from ``FUTURES_ASSET_CLASS_OVERRIDES`` / ``FUTURES_MULTIPLIERS``.
+    """
+
+    instrument_id: InstrumentId  # 如 InstrumentId(Symbol("SPY"), Venue("ARCA")) 或 (Symbol("MESU5"), Venue("XCME"))
     bar_specs: list[str]  # 如 1-MINUTE-LAST、1-DAY-LAST（仅支持外部聚合 + LAST 价）
     start: dt.date | dt.datetime  # 窗口起点；date 或 datetime，日期串交由 date_to_str 规范化
     end: dt.date | dt.datetime
+    futures_product_code: str | None = None  # None=股票/ETF；非空=期货产品码（MES/ES/CL/ZN…）
 
 
 # ======================================================================
@@ -99,7 +111,7 @@ class BarJob:
 CATALOG_PATH: str | None = r"."
 
 CONN = MassiveConn(
-    api_key=None,  # 设为 "xxxx" 或导出 MASSIVE_API_KEY / POLYGON_API_KEY 环境变量
+    api_key=os.getenv("MASSIVE_API_KEY"),  # 设为 "xxxx" 或导出 MASSIVE_API_KEY / POLYGON_API_KEY 环境变量
     rate_limit_per_min=5,  # 免费层；付费层按档位调高以加速
 )
 
@@ -107,14 +119,37 @@ CONN = MassiveConn(
 _today = dt.date.today()
 _one_year_ago = _today.replace(year=_today.year - 1)
 
+# 期货 product_code → Nautilus AssetClass 枚举名（未列出的产品默认 COMMODITY）。
+# MES/ES 是股指期货 → EQUITY；如还下 6E(欧元) → FX、ZN(10年期) → DEBT，自行追加。
+FUTURES_ASSET_CLASS_OVERRIDES: dict[str, str] = {
+    "MES": "EQUITY",
+    "ES": "EQUITY",
+}
+
+# 期货 product_code → 合约乘数（Massive 合约端点不暴露 multiplier）。
+# MES/ES 的乘数是 5；ES 是 50。下其它产品时按合约规格补全。
+FUTURES_MULTIPLIERS: dict[str, int] = {
+    "MES": 5,
+    "ES": 50,
+}
+
 # 股票/ETF 下载任务；留空列表则不下载。
 BAR_JOBS: list[BarJob] = [
     BarJob(
         instrument_id=InstrumentId(Symbol("SPY"), Venue("ARCA")),
         # 仅支持外部聚合 + LAST 价（见 _request_bars 的校验）。
-        bar_specs=["1-MINUTE-LAST"],
+        bar_specs=["1-MINUTE-LAST", "1-HOUR-LAST", "1-DAY-LAST"],
         start=_one_year_ago,
         end=_today,
+    ),
+    # Micro E-mini S&P 500 期货（MES）。ticker 须带具体月份/年码（如 MESU5 = 2025-09），
+    # 用 front-month（最近主力）合约；过期后请改为下一主力。venue 用 CME Globex 的 XCME。
+    BarJob(
+        instrument_id=InstrumentId(Symbol("MESU5"), Venue("XCME")),
+        bar_specs=["1-MINUTE-LAST", "1-HOUR-LAST", "1-DAY-LAST"],
+        start=_one_year_ago,
+        end=_today,
+        futures_product_code="MES",
     ),
 ]
 
@@ -142,6 +177,14 @@ def _bar_type_for(instrument_id: InstrumentId, bar_spec: str) -> BarType:
     return BarType(instrument_id, spec)
 
 
+def _date_to_start_ns(value: dt.date | dt.datetime) -> int:
+    """Coerce a date/datetime to UTC nanoseconds at start-of-day (for futures window_start)."""
+    if isinstance(value, dt.datetime):
+        return int(value.timestamp() * 1_000_000_000)
+    d = dt.datetime(value.year, value.month, value.day, tzinfo=dt.UTC)
+    return int(d.timestamp() * 1_000_000_000)
+
+
 def _fetch_aggs_in_thread(
     client,
     ticker: str,
@@ -152,43 +195,64 @@ def _fetch_aggs_in_thread(
     max_retries: int,
     bars_timestamp_on_close: bool,
     page_throttle: float,
+    is_future: bool,
 ) -> list[Bar]:
     """同步拉取整段 K线并解析 (在 worker 线程中执行).
 
-    Massive ``list_aggs`` 在 ``pagination=True``（工厂默认）下返回一个**惰性生成器**，
-    每翻一页才发一次请求。这里把"构造生成器 + 完整迭代 + parse"作为一个同步块跑在线程
-    里：翻页请求由 SDK 内置 ``urllib3 Retry`` 自动重试 429/5xx；额外用 ``page_throttle``
-    在每页之间插入 sleep，给免费层配额留余量。遇 ``BadResponse``（Retry 已耗尽）则按
-    指数退避重试整段请求，最多 ``max_retries`` 次。
+    股票/ETF 走 ``list_aggs`` (multiplier/timespan + from_/to, 毫秒时间戳);
+    期货走 ``list_futures_aggregates`` (resolution 字符串 + window_start_gte/lte, 纳秒时间戳)。
+    两条路径都把"构造生成器 + 完整迭代 + parse"作为一个同步块跑在线程里：翻页请求由
+    SDK 内置 ``urllib3 Retry`` 自动重试 429/5xx；额外用 ``page_throttle`` 在每页之间插入
+    sleep，给免费层配额留余量。
+
+    429 可能在两层抛出：(1) SDK 内部 Retry 耗尽 → ``MaxRetryError``；(2) Massive 返回
+    非 429 的错误体 → ``BadResponse``。两者都按指数退避重试整段请求，最多 ``max_retries``
+    次。注意：整段重试会重复拉取已下载的 bar，但免费层 ``list_aggs`` 无 offset 分页，
+    只能整段重拉；好在 429 通常在第一页就炸，重复量很小。
 
     注意：与适配器 ``MassiveDataClient._request_bars`` 不同，这里不经过
     ``rate_limited_call``（它只能包裹同步调用的"构造"，无法拦截惰性生成器的翻页请求）。
     对一个独立下载脚本，靠 SDK Retry + page_throttle 足够，也更直接。
 
     """
-    multiplier, timespan = bar_type_to_aggs_params(bar_type)
-    from_ = date_to_str(start)
-    to = date_to_str(end)
+    last_exc: Exception | None = None
+    if is_future:
+        resolution = bar_type_to_futures_resolution(bar_type)
+        start_ns = _date_to_start_ns(start)
+        end_ns = _date_to_start_ns(end)
+    else:
+        multiplier, timespan = bar_type_to_aggs_params(bar_type)
+        from_ = date_to_str(start)
+        to = date_to_str(end)
 
-    last_exc: BadResponse | None = None
     for attempt in range(max_retries + 1):
         try:
             bars: list[Bar] = []
-            # 构造惰性生成器（不发请求）；迭代时才逐页发 HTTP。
-            aggs_iter = client.list_aggs(
-                ticker,
-                multiplier,
-                timespan,
-                from_,
-                to,
-                adjusted=False,
-                sort="asc",
-                limit=pagination_limit,
-            )
-            for agg in aggs_iter:
-                bars.append(
-                    parse_bar(bar_type, agg, multiplier, timespan, bars_timestamp_on_close),
+            if is_future:
+                aggs_iter = client.list_futures_aggregates(
+                    ticker,
+                    resolution=resolution,
+                    window_start_gte=start_ns,
+                    window_start_lte=end_ns,
+                    sort="asc",
+                    limit=pagination_limit,
                 )
+                for agg in aggs_iter:
+                    bars.append(parse_futures_bar(bar_type, agg, resolution, bars_timestamp_on_close))
+            else:
+                # 构造惰性生成器（不发请求）；迭代时才逐页发 HTTP。
+                aggs_iter = client.list_aggs(
+                    ticker,
+                    multiplier,
+                    timespan,
+                    from_,
+                    to,
+                    adjusted=False,
+                    sort="asc",
+                    limit=pagination_limit,
+                )
+                for agg in aggs_iter:
+                    bars.append(parse_bar(bar_type, agg, multiplier, timespan, bars_timestamp_on_close))
                 # 每解析一个 agg 不节流；节流以"页"为单位，靠下方 page_throttle 实现。
             # SDK 的生成器按页 yield；粗粒度节流：每消费一批后 sleep。
             # 由于无法精确感知翻页边界，这里用一个轻量近似——仅在数据量较大时按
@@ -196,17 +260,20 @@ def _fetch_aggs_in_thread(
             if page_throttle > 0 and len(bars) >= pagination_limit:
                 time.sleep(page_throttle)
             return bars
-        except BadResponse as exc:
+        except (BadResponse, MaxRetryError) as exc:
             last_exc = exc
-            body = str(exc.args[0]) if exc.args else ""
-            if "rate limit" in body.lower() or "429" in body:
-                wait = 2.0**attempt
-                print(f"  [bars] 429 退避 {wait:.1f}s (attempt {attempt + 1}/{max_retries + 1})")
+            body = str(exc.args[0]) if exc.args else str(exc)
+            is_rate_limit = "rate limit" in body.lower() or "429" in body
+            if is_rate_limit or attempt < max_retries:
+                # 免费层配额窗口为 60s；429 退避必须能覆盖一个完整窗口让配额回血。
+                # 用 15*2**attempt、封顶 60s：15s → 30s → 60s → 60s → ...
+                wait = min(60.0, 15.0 * (2.0**attempt)) if is_rate_limit else 2.0**attempt
+                print(
+                    f"  [bars] {type(exc).__name__} 退避 {wait:.1f}s (attempt {attempt + 1}/{max_retries + 1})",
+                )
                 time.sleep(wait)
                 continue
-            if attempt >= max_retries:
-                break
-            time.sleep(2.0**attempt)
+            break
     assert last_exc is not None  # pragma: no cover - 循环必先置 last_exc 再 break
     raise last_exc
 
@@ -221,7 +288,11 @@ async def _download_bars(
     """Load the instrument definition, then fetch every configured bar spec into the catalog."""
     requested_id = job.instrument_id
     ticker = instrument_id_to_ticker(requested_id)
-    # 落 instrument 定义（Equity 经 get_ticker_details；写盘供回测撮合/费用计算用）。
+    is_future = job.futures_product_code is not None
+    if is_future:
+        print(f"  [dispatch] {ticker} → 期货端点 (product_code={job.futures_product_code})")
+    # 落 instrument 定义（Equity 经 get_ticker_details；FuturesContract 经 list_futures_contracts；
+    # 写盘供回测撮合/费用计算用）。
     await provider.load_ids_async([requested_id])
     # provider 解析 Equity 时可能用 get_ticker_details 返回的 primary_exchange 改写 venue
     # （见 instruments._parse_equity），故按 ticker 匹配而非用原始 id find，避免失配。
@@ -239,7 +310,7 @@ async def _download_bars(
         print(f"  [warn] 未取到 {requested_id} 的 instrument 定义，K线将沿用请求 id")
         bar_instrument_id = requested_id
 
-    for bar_spec in job.bar_specs:
+    for spec_idx, bar_spec in enumerate(job.bar_specs):
         bar_type = _bar_type_for(bar_instrument_id, bar_spec)
         print(f"  [bars] {bar_instrument_id} {bar_spec}  {date_to_str(job.start)} → {date_to_str(job.end)}")
         # 整个"构造生成器 + 翻页迭代 + parse"放进一个线程：避免跨线程驱动惰性生成器，
@@ -255,12 +326,21 @@ async def _download_bars(
             conn.max_retries,
             conn.bars_timestamp_on_close,
             conn.page_throttle,
+            is_future,
         )
         if not bars:
             print("  [bars] 无数据返回（检查标的/权限/日期范围）")
             continue
         catalog.write_data(bars)
         print(f"  [bars] 完成，共 {len(bars)} 根")
+        # 免费层配额按 60s 窗口滚动：上一个 spec 的请求（含其 429 退避重试）会把配额榨干，
+        # 下一个 spec 第一页很容易撞 429。下完一个 spec 后等一个完整 60s 窗口让配额回满，
+        # 最后一个 spec 无需等待。付费层可调高 rate_limit_per_min，冷却仍取满窗 60s 是保守
+        # 的——若觉得过慢，可手动把这段注释掉或调小。
+        if spec_idx < len(job.bar_specs) - 1:
+            cooldown = 60.0
+            print(f"  [bars] 等待配额回血 {cooldown:.0f}s ...")
+            await asyncio.sleep(cooldown)
 
 
 async def run(
@@ -284,8 +364,22 @@ async def run(
     rest_client = get_cached_massive_rest_client(api_key, base_url, trace=False)
     rate_limiter = get_cached_massive_rate_limiter(rate_limit_per_min, burst)
     clock = LiveClock()
-    provider = MassiveInstrumentProvider(client=rest_client, rate_limiter=rate_limiter, clock=clock)
+    # 聚合所有期货 job 的 product_code（去 None），用于 provider 把裸期货 ticker 派发到
+    # futures 端点；asset_class / multiplier overrides 来自配置区全局表。
+    futures_codes = {job.futures_product_code for job in bar_jobs if job.futures_product_code}
+    provider = MassiveInstrumentProvider(
+        client=rest_client,
+        rate_limiter=rate_limiter,
+        clock=clock,
+        config=MassiveInstrumentProviderConfig(
+            futures_product_codes=futures_codes or None,
+            futures_asset_class_overrides=FUTURES_ASSET_CLASS_OVERRIDES or None,
+            futures_multipliers=FUTURES_MULTIPLIERS or None,
+        ),
+    )
     print(f"[client] Massive REST 已就绪 ({base_url}, {rate_limit_per_min}/min, burst={burst})")
+    if futures_codes:
+        print(f"[client] 期货产品码: {sorted(futures_codes)}")
 
     for job in bar_jobs:
         print(f"[job] {job.instrument_id}")

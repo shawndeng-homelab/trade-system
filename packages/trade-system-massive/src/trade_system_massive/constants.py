@@ -24,3 +24,7 @@ OPTION_TICKER_PREFIX: Final[str] = "O:"
 
 # Venue used for US equity options (all US options route through OPRA).
 OPTION_VENUE: Final[str] = "OPRA"
+
+# Default venue for a futures contract when Massive reports no `trading_venue`.
+# XCBT (CME/CBOT) is the most common; override per-instrument from contract data.
+DEFAULT_FUTURES_VENUE: Final[str] = "XCBT"

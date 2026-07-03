@@ -130,13 +130,16 @@ class MassiveLiveDataClientFactory(LiveDataClientFactory):
         )
 
         # Configure on-start loading via the base provider config so `initialize()`
-        # dispatches correctly: full chain fetch only when underlyings are set,
-        # otherwise per-id fetch for the requested instrument_ids.
+        # dispatches correctly: full chain fetch only when underlyings or futures
+        # product codes are set, otherwise per-id fetch for the requested instrument_ids.
         provider_config = MassiveInstrumentProviderConfig(
-            load_all=bool(config.options_underlyings),
+            load_all=bool(config.options_underlyings or config.futures_product_codes),
             load_ids=list(config.instrument_ids) if config.instrument_ids else [],
             options_underlyings=config.options_underlyings,
             pagination_limit=config.pagination_limit,
+            futures_product_codes=config.futures_product_codes,
+            futures_asset_class_overrides=config.futures_asset_class_overrides,
+            futures_multipliers=config.futures_multipliers,
         )
         provider._config = provider_config
 

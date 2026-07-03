@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.5.0](https://github.com/shawndeng-homelab/trade-system/compare/32c3a873f444ba841079d20c4434d7a4f35107ae..0.5.0) - 2026-07-03
+### Package updates
+- [trade-system-venues-0.4.0](packages/trade-system-venues) bumped to [trade-system-venues-0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.3.0..trade-system-venues-0.4.0)
+- [trade-system-strategies-0.2.0](packages/trade-system-strategies) bumped to [trade-system-strategies-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.1.1..trade-system-strategies-0.2.0)
+### Global changes
+#### Features
+- add rsi backtesting scripts - ([9a0b822](https://github.com/shawndeng-homelab/trade-system/commit/9a0b822f9c548db2d2231121d8a503a7a14c36eb)) - ShawnDeng-code
+- update massive sdk - ([32c3a87](https://github.com/shawndeng-homelab/trade-system/commit/32c3a873f444ba841079d20c4434d7a4f35107ae)) - colyerdeng
+
+- - -
+
 ## [0.4.1](https://github.com/shawndeng-homelab/trade-system/compare/0.4.0..0.4.1) - 1970-01-01
 ### Package updates
 - [trade-system-strategies-0.1.1](packages/trade-system-strategies) bumped to [trade-system-strategies-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.1.0..trade-system-strategies-0.1.1)

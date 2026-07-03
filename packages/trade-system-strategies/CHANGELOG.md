@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-strategies-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/9a0b822f9c548db2d2231121d8a503a7a14c36eb..trade-system-strategies-0.2.0) - 2026-07-03
+#### Features
+- update massive sdk - ([32c3a87](https://github.com/shawndeng-homelab/trade-system/commit/32c3a873f444ba841079d20c4434d7a4f35107ae)) - colyerdeng
+- add rsi backtesting scripts - ([9a0b822](https://github.com/shawndeng-homelab/trade-system/commit/9a0b822f9c548db2d2231121d8a503a7a14c36eb)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-strategies-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/09b729e14de707bb9d0c9ff29e387e2a5bf95e8e..trade-system-strategies-0.1.1) - 2026-07-02
 #### Bug Fixes
 - **(strategies)** convert pmcc_research notebook to .ipynb to fix docs build - ([09b729e](https://github.com/shawndeng-homelab/trade-system/commit/09b729e14de707bb9d0c9ff29e387e2a5bf95e8e)) - ShawnDeng-code

@@ -20,8 +20,6 @@ exchange / clearing / regulatory pass-through fees IBKR adds on top. Add them la
 you need cent-accurate commissions.
 """
 
-
-
 from decimal import Decimal
 
 

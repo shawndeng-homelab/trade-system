@@ -1,7 +1,5 @@
 """PMCC strategy configuration."""
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.config import StrategyConfig

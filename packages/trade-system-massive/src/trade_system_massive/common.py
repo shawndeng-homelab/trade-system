@@ -63,12 +63,12 @@ def bar_type_to_aggs_params(bar_type: BarType) -> tuple[int, str]:
     bar_type : BarType
         The bar type. Must be externally aggregated, time-based, with step 1.
 
-    Returns
+    Returns:
     -------
     tuple[int, str]
         The ``(multiplier, timespan)`` for ``RESTClient.list_aggs``.
 
-    Raises
+    Raises:
     ------
     ValueError
         If `bar_type` cannot be mapped to a Massive aggregate.
@@ -93,8 +93,7 @@ def bar_type_to_aggs_params(bar_type: BarType) -> tuple[int, str]:
             return spec.step, TIMESPAN_DAY
         case _:
             raise ValueError(
-                f"bar type '{bar_type}' uses unsupported aggregation "
-                f"{spec.aggregation}; use SECOND/MINUTE/HOUR/DAY",
+                f"bar type '{bar_type}' uses unsupported aggregation {spec.aggregation}; use SECOND/MINUTE/HOUR/DAY",
             )
 
 

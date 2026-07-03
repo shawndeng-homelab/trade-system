@@ -35,8 +35,6 @@ asyncio.run(main())
 ```
 """
 
-
-
 import datetime as dt
 
 from ibapi.common import MarketDataTypeEnum

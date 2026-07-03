@@ -19,8 +19,6 @@ A position is closed when ``close_at_pnl`` is set (default 1.0 == 100% of max pr
 and ``pnl > close_at_pnl``.
 """
 
-
-
 from dataclasses import dataclass
 from decimal import Decimal
 

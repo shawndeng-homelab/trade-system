@@ -6,8 +6,6 @@ helpers resolve the row that applies to a given lookup key without pulling in a 
 dependency.
 """
 
-
-
 from decimal import Decimal
 
 

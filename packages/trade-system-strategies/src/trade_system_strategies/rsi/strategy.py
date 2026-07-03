@@ -7,8 +7,6 @@ sizing uses fractional Kelly from rolling realized-trade PnL
 (:mod:`~trade_system_strategies.shared.sizing`).
 """
 
-
-
 from decimal import Decimal
 
 from nautilus_trader.common.enums import LogColor
@@ -107,9 +105,9 @@ class RsiStrategy(Strategy):
         pnl = event.realized_pnl.as_decimal()
         ret = Decimal(str(event.realized_return))
         self._stats.record(pnl, ret)
+        kelly_frac = self._kelly_fraction() if self._stats.ready else self._config.kelly_fallback_fraction
         self.log.info(
-            f"Trade closed pnl={pnl} ret={ret} | stats: n={self._stats.count} "
-            f"cont_kelly={self._stats.continuous_kelly_fraction(self._config.kelly_fraction, self._config.kelly_max_fraction)}",
+            f"Trade closed pnl={pnl} ret={ret} | stats: n={self._stats.count} cont_kelly={kelly_frac!r}",
             color=LogColor.YELLOW,
         )
 

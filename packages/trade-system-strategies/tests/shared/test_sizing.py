@@ -9,6 +9,7 @@ from trade_system_strategies.shared.sizing import fractional_kelly
 from trade_system_strategies.shared.sizing import kelly_fraction
 from trade_system_strategies.shared.sizing import kelly_position_size
 
+
 D = Decimal
 
 
@@ -62,7 +63,7 @@ def test_kelly_position_size_nonpositive_price_is_zero():
 
 
 def test_trade_stats_ready_threshold():
-    """ready only after min_sample trades are recorded."""
+    """Ready only after min_sample trades are recorded."""
     stats = TradeStats(min_sample=3)
     assert not stats.ready
     stats.record(D("10"))

@@ -21,8 +21,6 @@ uv run --all-packages python scripts/download_ibkr_data.py
 ```
 """
 
-
-
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime

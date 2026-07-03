@@ -25,6 +25,7 @@ from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.identifiers import TradeId
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
+
 from trade_system_massive.common import first_nonzero
 from trade_system_massive.common import ms_to_ns
 

@@ -26,6 +26,7 @@ from nautilus_trader.model.instruments import Equity
 from nautilus_trader.model.instruments import OptionContract
 from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
+
 from trade_system_massive.common import is_option_ticker
 from trade_system_massive.common import option_kind_from_contract_type
 from trade_system_massive.common import ticker_to_venue

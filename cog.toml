@@ -50,3 +50,12 @@ changelog_path = "packages/trade-system-strategies/CHANGELOG.md"
 pre_bump_hooks = [
     "uv version --package trade-system-strategies {{version}}",
 ]
+
+# 字段含义同上(见 trade-system-core 的注释)
+[packages.trade-system-massive]
+path = "packages/trade-system-massive"
+public_api = true
+changelog_path = "packages/trade-system-massive/CHANGELOG.md"
+pre_bump_hooks = [
+    "uv version --package trade-system-massive {{version}}",
+]

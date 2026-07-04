@@ -87,3 +87,7 @@ deploy-all: build publish-all
 # Export pinned deps to requirements.txt
 export-deps:
     uv export --no-hashes --output-file requirements.txt
+
+# Add a new package to the workspace (creates package dir + updates cog.toml + syncs)
+add-package name:
+    uv run python scripts/add_package.py {{name}}

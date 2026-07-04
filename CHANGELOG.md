@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.6.0](https://github.com/shawndeng-homelab/trade-system/compare/68d10afd4620f0ccb8c0b06ec2af72d73ae30895..0.6.0) - 2026-07-04
+### Package updates
+- [trade-system-massive](packages/trade-system-massive) bumped to [trade-system-massive-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-massive-0.1.0)
+### Global changes
+#### Features
+- **(massive)** register package in cog.toml and add SPY 1-min download script - ([83f5305](https://github.com/shawndeng-homelab/trade-system/commit/83f5305c3b3899cea09d19653cd05ca8a55756c8)) - ShawnDeng-code
+- add add mmassive futures - ([68d10af](https://github.com/shawndeng-homelab/trade-system/commit/68d10afd4620f0ccb8c0b06ec2af72d73ae30895)) - ShawnDeng-code
+
+- - -
+
 ## [0.5.0](https://github.com/shawndeng-homelab/trade-system/compare/32c3a873f444ba841079d20c4434d7a4f35107ae..0.5.0) - 2026-07-03
 ### Package updates
 - [trade-system-venues-0.4.0](packages/trade-system-venues) bumped to [trade-system-venues-0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-venues-0.3.0..trade-system-venues-0.4.0)

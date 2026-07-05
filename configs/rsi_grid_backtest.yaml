@@ -1,7 +1,7 @@
 mode: backtest
 trader_id: "RSI-GRID-001"
 venues:
-  - name: ARCA
+  - name: ARCX
     oms_type: NETTING
     account_type: MARGIN
     starting_balances: ["10_000 USD"]
@@ -14,16 +14,16 @@ venues:
         prob_slippage: 0.05
 data:
   - catalog_path: "."
-    instrument_id: SPY.ARCA
-    bar_type: "SPY.ARCA-1-MINUTE-LAST-EXTERNAL"
+    instrument_id: SPY.ARCX
+    bar_type: "SPY.ARCX-1-MINUTE-LAST-EXTERNAL"
     start_time: "2026-01-02T00:00:00+00:00"
     end_time: "2026-06-30T00:00:00+00:00"
 strategies:
   - strategy_path: "trade_system_strategies.rsi.strategy:RsiStrategy"
     config_path: "trade_system_strategies.rsi.config:RsiConfig"
     config:
-      instrument_id: SPY.ARCA
-      bar_type: "SPY.ARCA-1-MINUTE-LAST-EXTERNAL"
+      instrument_id: SPY.ARCX
+      bar_type: "SPY.ARCX-1-MINUTE-LAST-EXTERNAL"
     param_grid:
       rsi_period: [10, 14, 20]
       upper_level: [0.65, 0.70, 0.75]

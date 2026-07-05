@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 # cocogitto uses {{version}} as a template variable in pre_bump_hooks;
 # build the literal string at runtime to keep the source clean.
 _COG_VERSION_PLACEHOLDER = "{" + "{version}" + "}"
@@ -29,6 +30,7 @@ pre_bump_hooks = [
 
 
 def main() -> None:
+    """Add a new package to the uv workspace."""
     if len(sys.argv) != 2:
         print("Usage: python scripts/add_package.py <package-name>", file=sys.stderr)
         sys.exit(1)

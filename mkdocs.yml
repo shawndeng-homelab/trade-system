@@ -10,6 +10,10 @@ nav:
   - Home: index.md
   - Strategies:
       - Option management: strategies/option-management.md
+  - NautilusTrader:
+      - NautilusTrader: nautilus/index.md
+      - 策略开发: nautilus/strategy.md
+      - 实盘部署: nautilus/deployment.md
   - API Reference: reference/
 plugins:
   - search

@@ -1,12 +1,29 @@
 [project]
 name = "trade-system-core"
 version = "0.1.0"
-description = "my trade tools"
+description = "Unified runner for backtest, live trading, and parameter optimization with OpenTelemetry observability"
 authors = [{name = "shawndeng", email = "shawndeng1109@qq.com"}]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12,<3.14.99"
-dependencies = []
+dependencies = [
+    "nautilus-trader[ib]~=1.230.0",
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+    "trade-system-venues",
+    "trade-system-strategies",
+]
+
+[project.optional-dependencies]
+massive = ["trade-system-massive"]
+ibkr = []
+all = ["trade-system-massive"]
+
+[project.scripts]
+trade-system = "trade_system_core.cli:cli"
 
 [build-system]
 requires = ["hatchling"]
@@ -14,3 +31,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trade_system_core"]
+
+[tool.uv.sources]
+trade-system-venues = { workspace = true }
+trade-system-strategies = { workspace = true }
+trade-system-massive = { workspace = true }

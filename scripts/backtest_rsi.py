@@ -32,6 +32,7 @@ def main() -> None:
         end_time="2026-06-30T00:00:00+00:00",
         starting_balances=["10_000 USD"],
         tearsheet=True,
+        output_dir=".tmp",
     )
 
     print("\n========== RSI Backtest Result ==========")

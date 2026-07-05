@@ -25,10 +25,11 @@ def cli() -> None:
 @cli.command()
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
 @click.option("--tearsheet", is_flag=True, default=False, help="Generate an interactive HTML tearsheet.")
+@click.option("--output-dir", default=None, help="Directory for HTML reports. Defaults to .tmp")
 @click.option("--grid", is_flag=True, default=False, help="Enable matrix backtesting (requires param_grid in config).")
 @click.option("--top-n", default=10, show_default=True, help="Show top N results in grid backtest.")
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Verbose output.")
-def backtest(config: Path, tearsheet: bool, grid: bool, top_n: int, verbose: bool) -> None:
+def backtest(config: Path, tearsheet: bool, output_dir: str | None, grid: bool, top_n: int, verbose: bool) -> None:
     """Run a backtest from a YAML configuration file.
 
     If --grid is set and the config contains param_grid entries, a Cartesian-product
@@ -53,14 +54,14 @@ def backtest(config: Path, tearsheet: bool, grid: bool, top_n: int, verbose: boo
     if grid and has_grid:
         _run_grid_backtest(run_config, top_n, verbose)
     else:
-        _run_single_backtest(run_config, tearsheet, verbose)
+        _run_single_backtest(run_config, tearsheet, output_dir, verbose)
 
 
-def _run_single_backtest(run_config, tearsheet: bool, verbose: bool) -> None:
+def _run_single_backtest(run_config, tearsheet: bool, output_dir: str | None, verbose: bool) -> None:
     """Execute a standard (non-grid) backtest."""
     from trade_system_core.backtest import run_backtest  # noqa: PLC0415
 
-    results = run_backtest(run_config, tearsheet=tearsheet)
+    results = run_backtest(run_config, tearsheet=tearsheet, output_dir=output_dir)
 
     for result in results:
         click.echo("\n========== Backtest Result ==========")
@@ -80,7 +81,8 @@ def _run_single_backtest(run_config, tearsheet: bool, verbose: bool) -> None:
             click.echo(f"[{currency}] {stats}")
 
     if tearsheet:
-        click.echo("\nTearsheet(s) written to: tearsheet_*.html")
+        out = output_dir or ".tmp"
+        click.echo(f"\nTearsheet(s) written to: {out}/tearsheet_*.html")
 
 
 def _run_grid_backtest(run_config, top_n: int, verbose: bool) -> None:
@@ -153,11 +155,20 @@ def live(config: Path, dry_run: bool, verbose: bool) -> None:
 @cli.command()
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
 @click.option("--tearsheet", is_flag=True, default=False, help="Generate tearsheet (backtest only).")
+@click.option("--output-dir", default=None, help="Directory for HTML reports. Defaults to .tmp")
 @click.option("--grid", is_flag=True, default=False, help="Enable matrix backtesting.")
 @click.option("--dry-run", is_flag=True, default=False, help="Simulated trading (live only).")
 @click.option("--top-n", default=10, show_default=True, help="Top N grid results.")
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Verbose output.")
-def run(config: Path, tearsheet: bool, grid: bool, dry_run: bool, top_n: int, verbose: bool) -> None:
+def run(
+    config: Path,
+    tearsheet: bool,
+    output_dir: str | None,
+    grid: bool,
+    dry_run: bool,
+    top_n: int,
+    verbose: bool,
+) -> None:
     """Auto-detect mode from config and run.
 
     Reads the ``mode`` field from the YAML config and delegates to
@@ -168,7 +179,15 @@ def run(config: Path, tearsheet: bool, grid: bool, dry_run: bool, top_n: int, ve
 
     if mode == "backtest":
         ctx = click.get_current_context()
-        ctx.invoke(backtest, config=config, tearsheet=tearsheet, grid=grid, top_n=top_n, verbose=verbose)
+        ctx.invoke(
+            backtest,
+            config=config,
+            tearsheet=tearsheet,
+            output_dir=output_dir,
+            grid=grid,
+            top_n=top_n,
+            verbose=verbose,
+        )
     elif mode == "live":
         ctx = click.get_current_context()
         ctx.invoke(live, config=config, dry_run=dry_run, verbose=verbose)

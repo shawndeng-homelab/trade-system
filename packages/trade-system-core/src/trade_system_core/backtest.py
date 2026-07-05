@@ -13,6 +13,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 from nautilus_trader.analysis.tearsheet import create_tearsheet
 from nautilus_trader.backtest.config import BacktestDataConfig
@@ -135,7 +136,34 @@ class GridBacktestResult:
 # ── Public API ──────────────────────────────────────────────────────────
 
 
-def run_backtest(config: RunConfig, *, tearsheet: bool = False) -> list[BacktestResult]:
+_DEFAULT_OUTPUT_DIR = Path(".tmp")
+
+
+def _resolve_output_dir(output_dir: str | Path | None) -> Path:
+    """Resolve and create the output directory for HTML reports.
+
+    Parameters
+    ----------
+    output_dir : str or Path or None
+        Explicit output directory.  When ``None``, defaults to ``.tmp``.
+
+    Returns:
+    -------
+    Path
+        The resolved (and created) output directory.
+
+    """
+    dir_path = Path(output_dir) if output_dir is not None else _DEFAULT_OUTPUT_DIR
+    dir_path.mkdir(parents=True, exist_ok=True)
+    return dir_path
+
+
+def run_backtest(
+    config: RunConfig,
+    *,
+    tearsheet: bool = False,
+    output_dir: str | Path | None = None,
+) -> list[BacktestResult]:
     """Execute a backtest from a :class:`RunConfig`.
 
     Parameters
@@ -144,6 +172,8 @@ def run_backtest(config: RunConfig, *, tearsheet: bool = False) -> list[Backtest
         The loaded YAML configuration.
     tearsheet : bool, optional
         If ``True``, generate an interactive HTML tearsheet for each result.
+    output_dir : str or Path or None, optional
+        Directory for HTML tearsheet output.  Defaults to ``.tmp``.
 
     Returns:
     -------
@@ -170,9 +200,10 @@ def run_backtest(config: RunConfig, *, tearsheet: bool = False) -> list[Backtest
     results = node.run()
 
     if tearsheet:
+        out = _resolve_output_dir(output_dir)
         engines = node.get_engines()
         for idx, engine in enumerate(engines):
-            path = f"tearsheet_{idx}.html"
+            path = str(out / f"tearsheet_{idx}.html")
             title = f"Backtest {idx}"
             create_tearsheet(engine, output_path=path, title=title)
 
@@ -194,6 +225,7 @@ def quick_backtest(
     fill_model: dict | None = None,
     latency_model: dict | None = None,
     tearsheet: bool = False,
+    output_dir: str | Path | None = None,
 ) -> BacktestResult:
     """Run a single-strategy backtest with minimal boilerplate.
 
@@ -207,9 +239,9 @@ def quick_backtest(
     strategy_config : dict
         Strategy-specific parameters.
     instrument_id : str
-        Instrument identifier (e.g. ``"SPY.ARCA"``).
+        Instrument identifier (e.g. ``"SPY.ARCX"``).
     bar_type : str
-        Bar type string (e.g. ``"SPY.ARCA-1-MINUTE-LAST-EXTERNAL"``).
+        Bar type string (e.g. ``"SPY.ARCX-1-MINUTE-LAST-EXTERNAL"``).
     catalog_path : str
         Path to the ParquetDataCatalog.
     start_time : str
@@ -229,6 +261,8 @@ def quick_backtest(
         ``config_path``, ``config``.
     tearsheet : bool, optional
         If ``True``, generate an HTML tearsheet.
+    output_dir : str or Path or None, optional
+        Directory for HTML tearsheet output.  Defaults to ``.tmp``.
 
     Returns:
     -------
@@ -258,7 +292,7 @@ def quick_backtest(
         ],
         strategies=[StrategyConfig(strategy_path=strategy_path, config_path=config_path, config=strategy_config)],
     )
-    results = run_backtest(run_config, tearsheet=tearsheet)
+    results = run_backtest(run_config, tearsheet=tearsheet, output_dir=output_dir)
     return results[0]
 
 

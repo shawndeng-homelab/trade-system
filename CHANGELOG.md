@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.7.0](https://github.com/shawndeng-homelab/trade-system/compare/5d5aff68c15212709e74e087ded9d4463fe61002..0.7.0) - 2026-07-06
+### Package updates
+- [trade-system-core](packages/trade-system-core) bumped to [trade-system-core-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-core-0.1.0)
+- [trade-system-strategies-0.3.0](packages/trade-system-strategies) bumped to [trade-system-strategies-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.2.0..trade-system-strategies-0.3.0)
+### Global changes
+#### Bug Fixes
+- use SPY.ARCX instrument id to match catalog data - ([587e95b](https://github.com/shawndeng-homelab/trade-system/commit/587e95bb87ba8819a5b87f4abd451942ce480730)) - ShawnDeng-code
+#### Features
+- **(core)** add unified runner for backtest, live trading, and parameter optimisation - ([5099428](https://github.com/shawndeng-homelab/trade-system/commit/5099428fbc8c0dc260a6c186d9900416a2dd8d80)) - ShawnDeng-code
+- **(core)** default HTML reports to .tmp dir, support configurable output_dir - ([072afa6](https://github.com/shawndeng-homelab/trade-system/commit/072afa639d62039e568a15cdb981ca73163ffc5c)) - ShawnDeng-code
+- add 'just add-package' command for workspace package creation - ([8411d53](https://github.com/shawndeng-homelab/trade-system/commit/8411d532e3221e8d15dbdb336deb5242f149a180)) - ShawnDeng-code
+- add orb strategy - ([5d5aff6](https://github.com/shawndeng-homelab/trade-system/commit/5d5aff68c15212709e74e087ded9d4463fe61002)) - ShawnDeng-code
+
+- - -
+
 ## [0.6.0](https://github.com/shawndeng-homelab/trade-system/compare/68d10afd4620f0ccb8c0b06ec2af72d73ae30895..0.6.0) - 2026-07-04
 ### Package updates
 - [trade-system-massive](packages/trade-system-massive) bumped to [trade-system-massive-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-massive-0.1.0)

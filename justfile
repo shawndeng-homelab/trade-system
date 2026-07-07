@@ -64,13 +64,47 @@ deploy-gh-pages:
 build:
     uv build --all-packages
 
-# Publish to public PyPI (skip packages whose version already exists)
+# Publish to public PyPI (only packages with new version tags)
 publish-pypi:
-    uv publish --check-url https://pypi.org/simple/
+    #!/usr/bin/env bash
+    set -euo pipefail
+    changed_files=""
+    for f in dist/*; do
+        basename=$$(basename "$$f")
+        pkg=$${basename%%-*}
+        ver=$${basename#*-}
+        ver=$${ver%%-*}
+        tag_name="$${pkg//_/-}-$$ver"
+        if git tag -l "$$tag_name" | grep -q .; then
+            changed_files="$$changed_files $$f"
+        fi
+    done
+    if [ -z "$$changed_files" ]; then
+        echo "No changed packages to publish"
+    else
+        uv publish --check-url https://pypi.org/simple/ $$changed_files
+    fi
 
-# Publish to the private PyPI server (skip packages whose version already exists)
+# Publish to the private PyPI server (only packages with new version tags)
 publish-pypi-server:
-    uv publish --username {{env_var('PYPI_SERVER_USERNAME')}} --password {{env_var('PYPI_SERVER_PASSWORD')}} --publish-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}} --check-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}}/simple/
+    #!/usr/bin/env bash
+    set -euo pipefail
+    changed_files=""
+    for f in dist/*; do
+        basename=$$(basename "$$f")
+        pkg=$${basename%%-*}
+        ver=$${basename#*-}
+        ver=$${ver%%-*}
+        tag_name="$${pkg//_/-}-$$ver"
+        if git tag -l "$$tag_name" | grep -q .; then
+            changed_files="$$changed_files $$f"
+        fi
+    done
+    if [ -z "$$changed_files" ]; then
+        echo "No changed packages to publish"
+    else
+        uv publish --username {{env_var('PYPI_SERVER_USERNAME')}} --password {{env_var('PYPI_SERVER_PASSWORD')}} --publish-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}} $$changed_files
+    fi
 
 # Publish to both indexes
 publish-all: publish-pypi publish-pypi-server

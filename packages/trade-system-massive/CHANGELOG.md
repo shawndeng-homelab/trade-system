@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-massive-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/4dac2e81a997fb8fd40345a36b58c462019fc412..trade-system-massive-0.1.1) - 2026-07-07
+#### Bug Fixes
+- **(massive)** bump version to 0.2.0 to resolve pypiserver hash mismatch - ([4dac2e8](https://github.com/shawndeng-homelab/trade-system/commit/4dac2e81a997fb8fd40345a36b58c462019fc412)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-massive-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/9a0b822f9c548db2d2231121d8a503a7a14c36eb..trade-system-massive-0.1.0) - 2026-07-04
 #### Features
 - **(massive)** register package in cog.toml and add SPY 1-min download script - ([83f5305](https://github.com/shawndeng-homelab/trade-system/commit/83f5305c3b3899cea09d19653cd05ca8a55756c8)) - ShawnDeng-code

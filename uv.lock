@@ -2680,7 +2680,7 @@ docs = [
 
 [[package]]
 name = "trade-system-core"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/trade-system-core" }
 dependencies = [
     { name = "click" },
@@ -2718,7 +2718,7 @@ provides-extras = ["massive", "ibkr", "all"]
 
 [[package]]
 name = "trade-system-massive"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/trade-system-massive" }
 dependencies = [
     { name = "massive" },

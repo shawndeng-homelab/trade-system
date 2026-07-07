@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.7.1](https://github.com/shawndeng-homelab/trade-system/compare/0.7.0..0.7.1) - 1970-01-01
+### Package updates
+- [trade-system-core-0.1.1](packages/trade-system-core) bumped to [trade-system-core-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-core-0.1.0..trade-system-core-0.1.1)
+- [trade-system-massive-0.1.1](packages/trade-system-massive) bumped to [trade-system-massive-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-massive-0.1.0..trade-system-massive-0.1.1)
+### Global changes
+
+- - -
+
 ## [0.7.0](https://github.com/shawndeng-homelab/trade-system/compare/5d5aff68c15212709e74e087ded9d4463fe61002..0.7.0) - 2026-07-06
 ### Package updates
 - [trade-system-core](packages/trade-system-core) bumped to [trade-system-core-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-core-0.1.0)

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-core-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/4dac2e81a997fb8fd40345a36b58c462019fc412..trade-system-core-0.1.1) - 2026-07-07
+#### Bug Fixes
+- **(massive)** bump version to 0.2.0 to resolve pypiserver hash mismatch - ([4dac2e8](https://github.com/shawndeng-homelab/trade-system/commit/4dac2e81a997fb8fd40345a36b58c462019fc412)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-core-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-core-0.1.0) - 2026-07-06
 #### Features
 - **(core)** default HTML reports to .tmp dir, support configurable output_dir - ([072afa6](https://github.com/shawndeng-homelab/trade-system/commit/072afa639d62039e568a15cdb981ca73163ffc5c)) - ShawnDeng-code

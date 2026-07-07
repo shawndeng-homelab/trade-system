@@ -1,6 +1,6 @@
 [project]
 name = "trade-system-massive"
-version = "0.2.0"
+version = "0.1.1"
 description = "NautilusTrader data adapter for the Massive.com (Polygon-compatible) REST + WebSocket API"
 authors = [{name = "shawndeng", email = "shawndeng1109@qq.com"}]
 license = "MIT"

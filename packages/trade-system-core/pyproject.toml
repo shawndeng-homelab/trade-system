@@ -1,6 +1,6 @@
 [project]
 name = "trade-system-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "Unified runner for backtest, live trading, and parameter optimization with OpenTelemetry observability"
 authors = [{name = "shawndeng", email = "shawndeng1109@qq.com"}]
 license = "MIT"

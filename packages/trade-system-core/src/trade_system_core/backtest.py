@@ -83,9 +83,17 @@ def _venue_config_to_backtest(vc: VenueConfig) -> BacktestVenueConfig:
 
 def _data_config_to_backtest(dc: DataConfig) -> BacktestDataConfig:
     """Convert a :class:`DataConfig` into a NautilusTrader :class:`BacktestDataConfig`."""
+    # bar_type format: "INSTRUMENT_ID-step-AGG-PRICE-AGGSRC"
+    #   e.g. "SPY.ARCX-1-HOUR-LAST-EXTERNAL"
+    # NautilusTrader's bar_spec is just "step-AGG": "1-HOUR"
     bar_spec = None
     if dc.bar_type:
-        bar_spec = dc.bar_type.split("-", maxsplit=1)[1].rsplit("-", maxsplit=1)[0]
+        # Strip instrument_id prefix (everything before first "-")
+        spec_part = dc.bar_type.split("-", maxsplit=1)[1]  # "1-HOUR-LAST-EXTERNAL"
+        # Take only the first two components: step + aggregation
+        parts = spec_part.split("-")
+        if len(parts) >= 2:
+            bar_spec = f"{parts[0]}-{parts[1]}"  # "1-HOUR"
 
     # NautilusTrader's BacktestDataConfig.data_cls requires a dotted "module:ClassName"
     # path that resolve_path() can parse.  Accept either a short name (e.g. "Bar",

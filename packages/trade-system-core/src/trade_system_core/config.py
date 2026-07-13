@@ -62,6 +62,10 @@ class DataConfig(msgspec.Struct, frozen=True):
         start_time: ISO-8601 start timestamp for backtest data.
         end_time: ISO-8601 end timestamp for backtest data.
         data_client: Registry key for the live data client (e.g. ``"MASSIVE"``).
+        data_cls: Data type name for the catalog query (e.g. ``"Bar"``,
+            ``"OptionContract"``).  When ``None``, defaults to ``"Bar"``.
+        instrument_ids: Multiple instrument identifiers for bulk loading.
+            When ``None``, the single ``instrument_id`` is used.
 
     """
 
@@ -71,6 +75,8 @@ class DataConfig(msgspec.Struct, frozen=True):
     start_time: str | None = None
     end_time: str | None = None
     data_client: str | None = None
+    data_cls: str | None = None
+    instrument_ids: list[str] | None = None
 
 
 class StrategyConfig(msgspec.Struct, frozen=True):

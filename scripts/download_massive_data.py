@@ -37,14 +37,17 @@ from dataclasses import dataclass
 
 from massive.exceptions import BadResponse
 from nautilus_trader.common.component import LiveClock
+from nautilus_trader.core.datetime import unix_nanos_to_dt
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.data import BarSpecification
 from nautilus_trader.model.data import BarType
 from nautilus_trader.model.enums import BarAggregation
+from nautilus_trader.model.enums import OptionKind
 from nautilus_trader.model.enums import PriceType
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.model.identifiers import Symbol
 from nautilus_trader.model.identifiers import Venue
+from nautilus_trader.model.instruments import OptionContract
 from nautilus_trader.persistence.catalog import ParquetDataCatalog
 from trade_system_massive.common import bar_type_to_aggs_params
 from trade_system_massive.common import bar_type_to_futures_resolution
@@ -103,6 +106,35 @@ class BarJob:
     futures_product_code: str | None = None  # None=股票/ETF；非空=期货产品码（MES/ES/CL/ZN…）
 
 
+@dataclass(frozen=True)
+class OptionJob:
+    """An option chain download job: instruments only, or instruments + bars.
+
+    Downloads all option contracts for the underlying from Massive, parses them
+    into NautilusTrader :class:`OptionContract` instruments, and writes them to
+    the catalog.  Optionally also downloads OHLCV bars for each contract.
+
+    Attributes:
+        underlying: Underlying equity ticker (e.g. ``"SPY"``).
+        contract_type: Filter by ``"call"`` / ``"put"`` / ``None`` (all).
+        expiration_date_gte: Only contracts expiring on or after this date.
+        expiration_date_lte: Only contracts expiring on or before this date.
+        bar_specs: Bar specs to download per contract (e.g. ``["1-DAY-LAST"]``).
+            ``None`` means only download instrument definitions, no bars.
+        start: Bar time-window start (only used when ``bar_specs`` is not None).
+        end: Bar time-window end (only used when ``bar_specs`` is not None).
+
+    """
+
+    underlying: str
+    contract_type: str | None = None
+    expiration_date_gte: str | None = None
+    expiration_date_lte: str | None = None
+    bar_specs: list[str] | None = None
+    start: dt.date | dt.datetime | None = None
+    end: dt.date | dt.datetime | None = None
+
+
 # ======================================================================
 # 配置区 —— 只改这里
 # ======================================================================
@@ -150,6 +182,18 @@ BAR_JOBS: list[BarJob] = [
         start=_one_year_ago,
         end=_today,
         futures_product_code="MES",
+    ),
+]
+
+# 期权链下载任务；留空列表则不下载。
+# PMCC 策略只需 option instruments（不下 bars），用 BS 近似估算价格。
+# 免费层 5 calls/min，SPY 全链数千合约，下载 bars 不现实。
+OPTION_JOBS: list[OptionJob] = [
+    OptionJob(
+        underlying="SPY",
+        expiration_date_gte="2026-01-01",
+        expiration_date_lte="2027-12-31",
+        # bar_specs=None → 只下 instrument 定义，不下 K线
     ),
 ]
 
@@ -343,12 +387,93 @@ async def _download_bars(
             await asyncio.sleep(cooldown)
 
 
+async def _download_option_chain(
+    provider: MassiveInstrumentProvider,
+    client,
+    catalog: ParquetDataCatalog,
+    job: OptionJob,
+    conn: MassiveConn,
+) -> None:
+    """Download option chain instruments (and optionally bars) for one underlying."""
+    underlying = job.underlying
+    print(f"  [options] Loading option chain for {underlying}...")
+
+    # Load all option contracts via the provider (which pages through list_options_contracts)
+    await provider._load_option_chain(underlying)
+
+    # Collect parsed OptionContract instruments
+    all_instruments = provider.get_all().values()
+    option_instruments: list[OptionContract] = []
+    for inst in all_instruments:
+        if not isinstance(inst, OptionContract):
+            continue
+        if inst.underlying != underlying:
+            continue
+        # Apply contract_type filter
+        if job.contract_type == "call" and inst.option_kind != OptionKind.CALL:
+            continue
+        if job.contract_type == "put" and inst.option_kind != OptionKind.PUT:
+            continue
+        # Apply expiration date filters
+        if job.expiration_date_gte or job.expiration_date_lte:
+            expiry = unix_nanos_to_dt(inst.expiration_ns).date()
+            if job.expiration_date_gte:
+                gte = dt.date.fromisoformat(job.expiration_date_gte)
+                if expiry < gte:
+                    continue
+            if job.expiration_date_lte:
+                lte = dt.date.fromisoformat(job.expiration_date_lte)
+                if expiry > lte:
+                    continue
+        option_instruments.append(inst)
+
+    if option_instruments:
+        catalog.write_data(option_instruments)
+        print(f"  [options] Wrote {len(option_instruments)} option contracts for {underlying}")
+    else:
+        print(f"  [options] No option contracts found for {underlying}")
+        return
+
+    # Optionally download bars for each option contract
+    if job.bar_specs and job.start is not None and job.end is not None:
+        total_bars = 0
+        for inst_idx, inst in enumerate(option_instruments):
+            ticker = inst.id.symbol.value
+            for _spec_idx, bar_spec in enumerate(job.bar_specs):
+                bar_type = _bar_type_for(inst.id, bar_spec)
+                try:
+                    bars = await asyncio.to_thread(
+                        _fetch_aggs_in_thread,
+                        client,
+                        ticker,
+                        bar_type,
+                        job.start,
+                        job.end,
+                        conn.pagination_limit,
+                        conn.max_retries,
+                        conn.bars_timestamp_on_close,
+                        conn.page_throttle,
+                        is_future=False,
+                    )
+                    if bars:
+                        catalog.write_data(bars)
+                        total_bars += len(bars)
+                except Exception as exc:
+                    print(f"  [options] Skipping {ticker}: {exc}")
+                    continue
+            # Rate limit between contracts (5 calls/min free tier)
+            if inst_idx < len(option_instruments) - 1 and conn.page_throttle <= 0:
+                await asyncio.sleep(12.0)  # ~5 calls/min budget
+        print(f"  [options] Downloaded {total_bars} bars across {len(option_instruments)} contracts")
+
+
 async def run(
     conn: MassiveConn,
     catalog_path: str | None,
     bar_jobs: list[BarJob],
+    option_jobs: list[OptionJob] | None = None,
 ) -> None:
-    """Assemble the Massive client/limiter/provider and run every configured bar job."""
+    """Assemble the Massive client/limiter/provider and run every configured job."""
     catalog = _resolve_catalog(catalog_path)
     print(f"[catalog] 数据将写入: {catalog.path}")
 
@@ -367,6 +492,8 @@ async def run(
     # 聚合所有期货 job 的 product_code（去 None），用于 provider 把裸期货 ticker 派发到
     # futures 端点；asset_class / multiplier overrides 来自配置区全局表。
     futures_codes = {job.futures_product_code for job in bar_jobs if job.futures_product_code}
+    # 聚合所有 option job 的 underlying，用于 provider 预加载 option chain
+    option_underlyings = {job.underlying for job in (option_jobs or [])} if option_jobs else set()
     provider = MassiveInstrumentProvider(
         client=rest_client,
         rate_limiter=rate_limiter,
@@ -375,15 +502,22 @@ async def run(
             futures_product_codes=futures_codes or None,
             futures_asset_class_overrides=FUTURES_ASSET_CLASS_OVERRIDES or None,
             futures_multipliers=FUTURES_MULTIPLIERS or None,
+            options_underlyings=option_underlyings or None,
         ),
     )
     print(f"[client] Massive REST 已就绪 ({base_url}, {rate_limit_per_min}/min, burst={burst})")
     if futures_codes:
         print(f"[client] 期货产品码: {sorted(futures_codes)}")
+    if option_underlyings:
+        print(f"[client] 期权标的: {sorted(option_underlyings)}")
 
     for job in bar_jobs:
         print(f"[job] {job.instrument_id}")
         await _download_bars(provider, rest_client, catalog, job, conn)
+
+    for job in option_jobs or []:
+        print(f"[option-job] {job.underlying}")
+        await _download_option_chain(provider, rest_client, catalog, job, conn)
 
     print("[done] 全部下载完成")
 
@@ -402,4 +536,4 @@ def _to_config(conn: MassiveConn) -> MassiveDataClientConfig:
 
 
 if __name__ == "__main__":
-    asyncio.run(run(CONN, CATALOG_PATH, BAR_JOBS))
+    asyncio.run(run(CONN, CATALOG_PATH, BAR_JOBS, OPTION_JOBS))

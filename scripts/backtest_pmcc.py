@@ -9,6 +9,7 @@ Run:
 from decimal import Decimal
 
 from trade_system_core import quick_backtest
+from trade_system_core.config import DataConfig
 
 
 def main() -> None:
@@ -47,6 +48,14 @@ def main() -> None:
         starting_balances=["100_000 USD"],
         tearsheet=True,
         output_dir=".tmp",
+        extra_data=[
+            DataConfig(
+                catalog_path=".",
+                data_cls="OptionContract",
+                start_time="2026-01-02T00:00:00+00:00",
+                end_time="2026-06-30T00:00:00+00:00",
+            ),
+        ],
     )
 
     print("\n========== PMCC Backtest Result ==========")

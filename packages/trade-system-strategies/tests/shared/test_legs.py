@@ -45,3 +45,34 @@ def test_group_incomplete_when_a_leg_partial():
     group.add_leg(LegSpec("LEAPS", "BUY", Decimal("2")), "buy-1")
     group.apply_fill("buy-1", Decimal("1"), Decimal("20.00"))
     assert group.is_complete is False
+
+
+# --- has_order / order_ids (new accessors) -------------------------------------------
+
+
+def test_has_order_returns_true_for_registered_order():
+    """has_order returns True for an order id that was added."""
+    group = LegGroup(name="test")
+    group.add_leg(LegSpec("A", "BUY", Decimal("1")), "order-1")
+    assert group.has_order("order-1") is True
+
+
+def test_has_order_returns_false_for_unknown_order():
+    """has_order returns False for an order id that was never added."""
+    group = LegGroup(name="test")
+    group.add_leg(LegSpec("A", "BUY", Decimal("1")), "order-1")
+    assert group.has_order("order-999") is False
+
+
+def test_order_ids_returns_all_registered_ids():
+    """order_ids returns the set of all client order IDs in the group."""
+    group = LegGroup(name="test")
+    group.add_leg(LegSpec("A", "BUY", Decimal("1")), "buy-1")
+    group.add_leg(LegSpec("B", "SELL", Decimal("1")), "sell-1")
+    assert group.order_ids == {"buy-1", "sell-1"}
+
+
+def test_order_ids_empty_for_new_group():
+    """A fresh group has no order IDs."""
+    group = LegGroup(name="test")
+    assert group.order_ids == set()

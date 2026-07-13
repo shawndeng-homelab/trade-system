@@ -104,6 +104,8 @@ class SelectionConfig:
     spot: Decimal | None = None
     exclude_min_dte: int = 0
     max_expirations: int | None = None
+    delta_mode: str = "below"
+    delta_tolerance: Decimal | None = None
 
 
 def _strike_is_valid(candidate: OptionCandidate, config: SelectionConfig) -> bool:
@@ -132,7 +134,17 @@ def _dte_is_valid(candidate: OptionCandidate, config: SelectionConfig) -> bool:
 
 
 def _delta_is_valid(candidate: OptionCandidate, config: SelectionConfig) -> bool:
-    """Apply ``abs(delta) <= target_delta`` (delta_is_valid, :175:253)."""
+    """Validate delta per ``config.delta_mode``.
+
+    ``"below"`` (default): ``abs(delta) <= target_delta`` — used for short options.
+    ``"near"``: ``abs(abs(delta) - target_delta) <= delta_tolerance`` — used for long
+    legs (e.g. LEAPS) where delta should be close to a target, not below it.
+    """
+    if config.delta_mode == "near":
+        if config.delta_tolerance is None:
+            return True
+        return abs(abs(candidate.delta) - config.target_delta) <= config.delta_tolerance
+    # Default "below" mode: abs(delta) <= target_delta.
     return abs(candidate.delta) <= config.target_delta
 
 
@@ -156,13 +168,24 @@ def _open_interest_is_valid(candidate: OptionCandidate, config: SelectionConfig)
 def _sort_candidates(
     candidates: list[OptionCandidate],
     delta_desc: bool,
+    config: SelectionConfig | None = None,
 ) -> list[OptionCandidate]:
-    """Sort by ``abs(delta)`` (desc for puts) then stable by DTE ascending.
+    """Sort candidates according to ``config.delta_mode``.
 
-    Mirrors thetagang ``filter_remaining_tickers`` (:175:315): the inner sort on
-    delta is stable, so the outer DTE sort preserves the delta ordering within each
-    DTE — yielding the shortest-dated contract with the highest acceptable delta.
+    ``"below"`` (default): sort by ``abs(delta)`` (desc for puts, asc for calls) then
+    stable by DTE ascending — yielding the shortest-dated contract with the highest
+    acceptable delta for puts, or the lowest delta for calls.
+
+    ``"near"``: sort by ``abs(abs(delta) - target_delta)`` ascending (closest to target
+    first) then by DTE ascending — yielding the shortest-dated contract whose delta is
+    closest to the target.
     """
+    if config is not None and config.delta_mode == "near":
+        target = config.target_delta
+        return sorted(
+            sorted(candidates, key=lambda c: abs(abs(c.delta) - target)),
+            key=lambda c: c.dte,
+        )
     return sorted(
         sorted(candidates, key=lambda c: abs(c.delta), reverse=delta_desc),
         key=lambda c: c.dte,
@@ -210,11 +233,11 @@ def select_short_option(
         passed = [c for c in passed if _open_interest_is_valid(c, config)]
 
     if passed:
-        ordered = _sort_candidates(passed, delta_desc)
+        ordered = _sort_candidates(passed, delta_desc, config)
     elif fallback and config.minimum_price > 0 and delta_rejects:
         if config.minimum_open_interest > 0:
             delta_rejects = [c for c in delta_rejects if _open_interest_is_valid(c, config)]
-        ordered = _sort_candidates(delta_rejects, not delta_desc)
+        ordered = _sort_candidates(delta_rejects, not delta_desc, config)
     else:
         return None
 

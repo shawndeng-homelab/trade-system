@@ -98,6 +98,15 @@ class LegGroup:
         return bool(self.legs) and all(leg.is_complete for leg in self.legs)
 
     @property
+    def order_ids(self) -> set[str]:
+        """Return all registered client order IDs."""
+        return set(self._order_to_leg.keys())
+
+    def has_order(self, client_order_id: str) -> bool:
+        """Return whether this group tracks the given client order ID."""
+        return client_order_id in self._order_to_leg
+
+    @property
     def net_cost(self) -> Decimal:
         """Net premium: positive = debit paid, negative = credit received.
 

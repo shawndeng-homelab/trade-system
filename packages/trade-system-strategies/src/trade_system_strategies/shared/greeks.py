@@ -1,18 +1,15 @@
-"""Greeks helpers wrapping NautilusTrader's ``GreeksCalculator``.
+"""Greeks helpers wrapping NautilusTrader's native Black-Scholes models.
 
 Thin convenience layer so strategies and research notebooks share one way to compute
-per-leg and portfolio greeks. The engine-coupled ``GreeksCalculator`` lives behind
-``self.greeks`` on a running strategy; here we expose pure helpers for the parts that
-do not need an engine (leg-level Black-Scholes, delta lookup).
+per-leg and portfolio greeks. The heavy lifting is done by
+:func:`nautilus_trader.model.greeks.black_scholes_greeks`; this module keeps the
+``Decimal``-based interface and preserves the engine-free constraint for unit testing
+and notebook reuse.
 """
 
-import math
 from decimal import Decimal
 
-
-def _norm_cdf(x: float) -> float:
-    """Standard normal CDF approximation via ``math.erf``."""
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+from trade_system_strategies.shared.option_pricing import bs_greeks
 
 
 def approx_call_delta(
@@ -22,11 +19,10 @@ def approx_call_delta(
     risk_free_rate: Decimal = Decimal("0.05"),
     volatility: Decimal = Decimal("0.25"),
 ) -> Decimal:
-    """Approximate call delta using Black-Scholes d1 -> N(d1).
+    """Compute call delta via NautilusTrader's native Black-Scholes model.
 
-    NautilusTrader backtest does not compute greeks, so this pure-function
-    approximation is used when pre-computed deltas are unavailable (e.g. when
-    selecting LEAPS candidates from a catalog that lacks model greeks).
+    Delegates to :func:`~trade_system_strategies.shared.option_pricing.bs_greeks`
+    for accurate results (replaces the former hand-rolled ``math.erf`` approximation).
 
     Args:
         strike: Option strike price.
@@ -36,19 +32,10 @@ def approx_call_delta(
         volatility: Annualised implied volatility (default 25%).
 
     Returns:
-        Approximate call delta as a ``Decimal`` in (0, 1).
+        Call delta as a ``Decimal`` in (0, 1).
 
     """
-    if dte <= 0 or spot <= 0 or strike <= 0 or volatility <= 0:
-        return Decimal("0")
-    t = float(dte) / 365.0
-    s = float(spot)
-    k = float(strike)
-    r = float(risk_free_rate)
-    v = float(volatility)
-    sqrt_t = math.sqrt(t)
-    d1 = (math.log(s / k) + (r + 0.5 * v * v) * t) / (v * sqrt_t)
-    return Decimal(str(round(_norm_cdf(d1), 6)))
+    return bs_greeks(spot, strike, dte, risk_free_rate, volatility, is_call=True).delta
 
 
 def approx_put_delta(
@@ -58,7 +45,7 @@ def approx_put_delta(
     risk_free_rate: Decimal = Decimal("0.05"),
     volatility: Decimal = Decimal("0.25"),
 ) -> Decimal:
-    """Approximate put delta as ``call_delta - 1`` via put-call parity.
+    """Compute put delta as ``call_delta - 1`` via put-call parity.
 
     Args:
         strike: Option strike price.
@@ -68,7 +55,7 @@ def approx_put_delta(
         volatility: Annualised implied volatility (default 25%).
 
     Returns:
-        Approximate put delta as a ``Decimal`` in (-1, 0).
+        Put delta as a ``Decimal`` in (-1, 0).
 
     """
     return approx_call_delta(strike, spot, dte, risk_free_rate, volatility) - Decimal("1")

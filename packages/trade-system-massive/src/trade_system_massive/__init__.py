@@ -8,6 +8,11 @@ definitions, and last-quote order-book snapshots); real-time WebSocket streaming
 planned for v2.
 """
 
+from trade_system_massive.catalog_loader import default_catalog
+from trade_system_massive.catalog_loader import download_option_bars
+from trade_system_massive.catalog_loader import download_option_chain
+from trade_system_massive.catalog_loader import download_underlying_bars
+from trade_system_massive.catalog_loader import make_client
 from trade_system_massive.config import MassiveDataClientConfig
 from trade_system_massive.constants import MASSIVE
 from trade_system_massive.data_client import MassiveDataClient
@@ -23,4 +28,9 @@ __all__ = [
     "MassiveInstrumentProvider",
     "MassiveInstrumentProviderConfig",
     "MassiveLiveDataClientFactory",
+    "default_catalog",
+    "download_option_bars",
+    "download_option_chain",
+    "download_underlying_bars",
+    "make_client",
 ]

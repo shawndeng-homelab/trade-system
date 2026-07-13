@@ -67,6 +67,23 @@ def clamp_to_9dp(value: Any) -> str:
     return str(dec)
 
 
+def clamp_volume(value: Any) -> str:
+    """Return ``value`` as an integer string for Nautilus ``Quantity``.
+
+    Massive API returns volumes as either ``int`` or ``float`` (e.g. ``74814505.0``).
+    Using ``Quantity.from_str("74814505.0")`` creates a quantity with precision=1,
+    but instruments typically have ``size_precision=0`` (integer shares/contracts).
+    This function strips the fractional part to produce a precision-0 string.
+
+    """
+    dec = Decimal(str(value))
+    # Clamp to 9dp if needed (same as clamp_to_9dp)
+    if dec.as_tuple().exponent < -_NAUTILUS_MAX_PRECISION:
+        dec = dec.quantize(_QUANT_9DP)
+    # Normalize to remove trailing zeros: 74814505.0 → 74814505
+    return str(dec.normalize()) if dec == dec.to_integral_value() else str(dec)
+
+
 def instrument_id_to_ticker(instrument_id: InstrumentId) -> str:
     """Return the Massive ticker string for a Nautilus instrument id.
 

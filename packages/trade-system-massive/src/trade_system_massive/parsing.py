@@ -28,6 +28,7 @@ from nautilus_trader.model.objects import Price
 from nautilus_trader.model.objects import Quantity
 
 from trade_system_massive.common import clamp_to_9dp
+from trade_system_massive.common import clamp_volume
 from trade_system_massive.common import first_nonzero
 from trade_system_massive.common import ms_to_ns
 from trade_system_massive.common import resolution_duration_ns
@@ -39,8 +40,8 @@ def _price(value: Any) -> Price:
 
 
 def _size(value: Any) -> Quantity:
-    """Build a ``Quantity`` from a Massive numeric, clamped to Nautilus's 9-digit max."""
-    return Quantity.from_str(clamp_to_9dp(value))
+    """Build a ``Quantity`` from a Massive numeric, normalizing integer volumes."""
+    return Quantity.from_str(clamp_volume(value))
 
 
 def _tick_ts(sip_ns: int, participant_ns: int) -> int:

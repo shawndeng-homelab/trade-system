@@ -248,3 +248,81 @@ def test_select_exclude_min_dte_for_forward_rolls():
     chosen = select_short_option(chain, cfg)
     assert chosen is not None
     assert chosen.dte == 25
+
+
+# --- delta_mode="near" (for LEAPS / long leg selection) ------------------------------
+
+
+def test_delta_mode_near_accepts_close_to_target():
+    """With delta_mode="near", a candidate close to target_delta passes."""
+    cfg = SelectionConfig(
+        right="C",
+        target_dte=60,
+        target_delta=Decimal("0.80"),
+        delta_mode="near",
+        delta_tolerance=Decimal("0.10"),
+        spot=Decimal("400"),
+        strike_limit=Decimal("300"),  # deep ITM calls pass the strike filter
+    )
+    chain = [
+        _call(350, 90, 0.82, 50.0),  # gap 0.02 -> within tolerance
+        _call(360, 90, 0.75, 40.0),  # gap 0.05 -> within tolerance
+        _call(430, 90, 0.20, 2.0),  # gap 0.60 -> outside tolerance
+    ]
+    chosen = select_short_option(chain, cfg)
+    assert chosen is not None
+    assert chosen.instrument_id == "C350"  # closest to target (gap 0.02)
+
+
+def test_delta_mode_near_rejects_all_when_tolerance_tight():
+    """A tight delta_tolerance excludes all candidates."""
+    cfg = SelectionConfig(
+        right="C",
+        target_dte=60,
+        target_delta=Decimal("0.80"),
+        delta_mode="near",
+        delta_tolerance=Decimal("0.01"),
+        spot=Decimal("400"),
+    )
+    chain = [
+        _call(350, 90, 0.82, 50.0),  # gap 0.02 > 0.01 -> excluded
+        _call(360, 90, 0.75, 40.0),  # gap 0.05 > 0.01 -> excluded
+    ]
+    assert select_short_option(chain, cfg) is None
+
+
+def test_delta_mode_near_no_tolerance_accepts_all():
+    """With delta_tolerance=None, the near mode imposes no delta filter."""
+    cfg = SelectionConfig(
+        right="C",
+        target_dte=60,
+        target_delta=Decimal("0.80"),
+        delta_mode="near",
+        delta_tolerance=None,
+        spot=Decimal("400"),
+        strike_limit=Decimal("300"),
+    )
+    chain = [
+        _call(350, 90, 0.82, 50.0),
+        _call(430, 90, 0.20, 2.0),
+    ]
+    chosen = select_short_option(chain, cfg)
+    # Both pass delta filter (no tolerance = no filter); sort by delta asc for calls
+    assert chosen is not None
+
+
+def test_delta_mode_below_still_default():
+    """The default delta_mode="below" still works as before."""
+    cfg = SelectionConfig(
+        right="C",
+        target_dte=7,
+        target_delta=Decimal("0.30"),
+        spot=Decimal("400"),
+    )
+    chain = [
+        _call(410, 7, 0.35, 2.0),  # above target -> excluded
+        _call(415, 7, 0.25, 1.5),  # below target -> ok
+    ]
+    chosen = select_short_option(chain, cfg)
+    assert chosen is not None
+    assert chosen.instrument_id == "C415"

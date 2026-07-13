@@ -41,6 +41,7 @@ from trade_system_strategies.shared.legs import LegGroup
 from trade_system_strategies.shared.legs import LegSpec
 from trade_system_strategies.shared.management import PositionSnapshot
 from trade_system_strategies.shared.management import RollWhenConfig
+from trade_system_strategies.shared.option_pricing import bs_call_price
 from trade_system_strategies.shared.selection import OptionCandidate
 from trade_system_strategies.shared.selection import SelectionConfig
 from trade_system_strategies.shared.selection import select_short_option
@@ -673,18 +674,13 @@ class PMCCStrategy(Strategy):
         strike: Decimal,
         dte: int,
     ) -> Decimal:
-        """Roughly estimate the current price of the short call for PnL tracking.
+        """Estimate the current price of the short call for PnL tracking.
 
-        Uses the difference between the LEAPS delta and the short call delta as a
-        proxy for the remaining time value. For a more accurate model, the strategy
-        should be run with pre-computed greeks in the catalog.
+        Uses NautilusTrader's native Black-Scholes model via
+        :func:`~trade_system_strategies.shared.option_pricing.bs_call_price`
+        for accurate pricing.
         """
-        delta = approx_call_delta(strike, spot, dte)
-        # Intrinsic value for OTM call is 0; for ITM call is spot - strike
-        intrinsic = max(Decimal("0"), spot - strike)
-        # Time value proxy: scale by delta (higher delta = more time value)
-        time_value = spot * delta * Decimal(str(dte)) / Decimal("365") * Decimal("0.25")
-        return intrinsic + time_value
+        return bs_call_price(spot, strike, dte)
 
     def _track_fill_prices(self, client_order_id: str, fill_price: Decimal) -> None:
         """Record fill prices for LEAPS and short legs based on the leg group mapping."""

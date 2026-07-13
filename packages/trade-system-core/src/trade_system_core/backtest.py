@@ -87,9 +87,23 @@ def _data_config_to_backtest(dc: DataConfig) -> BacktestDataConfig:
     if dc.bar_type:
         bar_spec = dc.bar_type.split("-", maxsplit=1)[1].rsplit("-", maxsplit=1)[0]
 
+    # NautilusTrader's BacktestDataConfig.data_cls requires a dotted "module:ClassName"
+    # path that resolve_path() can parse.  Accept either a short name (e.g. "Bar",
+    # "OptionContract") or a full path (e.g. "nautilus_trader.model.data:Bar").
+    _DATA_CLS_ALIASES: dict[str, str] = {
+        "Bar": "nautilus_trader.model.data:Bar",
+        "TradeTick": "nautilus_trader.model.data:TradeTick",
+        "QuoteTick": "nautilus_trader.model.data:QuoteTick",
+        "OptionContract": "nautilus_trader.model.instruments:OptionContract",
+        "Equity": "nautilus_trader.model.instruments:Equity",
+        "FuturesContract": "nautilus_trader.model.instruments:FuturesContract",
+    }
+    raw_cls = dc.data_cls or "Bar"
+    resolved_cls = _DATA_CLS_ALIASES.get(raw_cls, raw_cls)
+
     return BacktestDataConfig(
         catalog_path=dc.catalog_path or "",
-        data_cls=dc.data_cls or "Bar",
+        data_cls=resolved_cls,
         instrument_id=dc.instrument_id or None,
         instrument_ids=dc.instrument_ids,
         bar_spec=bar_spec,

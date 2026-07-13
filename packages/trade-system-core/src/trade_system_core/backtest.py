@@ -23,7 +23,6 @@ from nautilus_trader.backtest.config import BacktestVenueConfig
 from nautilus_trader.backtest.node import BacktestNode
 from nautilus_trader.backtest.results import BacktestResult
 from nautilus_trader.config import ImportableStrategyConfig
-from nautilus_trader.model.data import Bar
 from nautilus_trader.model.enums import AccountType
 from nautilus_trader.model.enums import OmsType
 from nautilus_trader.model.identifiers import TraderId
@@ -84,11 +83,16 @@ def _venue_config_to_backtest(vc: VenueConfig) -> BacktestVenueConfig:
 
 def _data_config_to_backtest(dc: DataConfig) -> BacktestDataConfig:
     """Convert a :class:`DataConfig` into a NautilusTrader :class:`BacktestDataConfig`."""
+    bar_spec = None
+    if dc.bar_type:
+        bar_spec = dc.bar_type.split("-", maxsplit=1)[1].rsplit("-", maxsplit=1)[0]
+
     return BacktestDataConfig(
         catalog_path=dc.catalog_path or "",
-        data_cls=Bar,
-        instrument_id=dc.instrument_id,
-        bar_spec=dc.bar_type.split("-", maxsplit=1)[1].rsplit("-", maxsplit=1)[0] if dc.bar_type else "1-MINUTE",
+        data_cls=dc.data_cls or "Bar",
+        instrument_id=dc.instrument_id or None,
+        instrument_ids=dc.instrument_ids,
+        bar_spec=bar_spec,
         start_time=dc.start_time,
         end_time=dc.end_time,
     )
@@ -226,6 +230,7 @@ def quick_backtest(
     latency_model: dict | None = None,
     tearsheet: bool = False,
     output_dir: str | Path | None = None,
+    extra_data: list[DataConfig] | None = None,
 ) -> BacktestResult:
     """Run a single-strategy backtest with minimal boilerplate.
 
@@ -263,12 +268,27 @@ def quick_backtest(
         If ``True``, generate an HTML tearsheet.
     output_dir : str or Path or None, optional
         Directory for HTML tearsheet output.  Defaults to ``.tmp``.
+    extra_data : list[DataConfig] or None, optional
+        Additional data configurations appended to the primary bar data
+        (e.g. option instruments for multi-asset strategies).
 
     Returns:
     -------
     BacktestResult
 
     """
+    data_list: list[DataConfig] = [
+        DataConfig(
+            catalog_path=catalog_path,
+            instrument_id=instrument_id,
+            bar_type=bar_type,
+            start_time=start_time,
+            end_time=end_time,
+        )
+    ]
+    if extra_data:
+        data_list.extend(extra_data)
+
     run_config = RunConfig(
         mode="backtest",
         trader_id="QUICK-BT-001",
@@ -281,15 +301,7 @@ def quick_backtest(
                 latency_model=latency_model,
             ),
         ],
-        data=[
-            DataConfig(
-                catalog_path=catalog_path,
-                instrument_id=instrument_id,
-                bar_type=bar_type,
-                start_time=start_time,
-                end_time=end_time,
-            )
-        ],
+        data=data_list,
         strategies=[StrategyConfig(strategy_path=strategy_path, config_path=config_path, config=strategy_config)],
     )
     results = run_backtest(run_config, tearsheet=tearsheet, output_dir=output_dir)

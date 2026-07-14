@@ -1,6 +1,6 @@
 """Click CLI entry point for trade-system.
 
-Three commands:
+Commands:
 
 - ``trade-system backtest <config.yaml>`` — run a backtest
 - ``trade-system live <config.yaml>`` — run live trading
@@ -19,27 +19,20 @@ from trade_system_core.config import load_config
 
 @click.group()
 def cli() -> None:
-    """Trade system CLI — unified entry point for backtest, live, and parameter optimisation."""
+    """Trade system CLI — unified entry point for backtest and live trading."""
 
 
 @cli.command()
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
 @click.option("--tearsheet", is_flag=True, default=False, help="Generate an interactive HTML tearsheet.")
 @click.option("--output-dir", default=None, help="Directory for HTML reports. Defaults to .tmp")
-@click.option("--grid", is_flag=True, default=False, help="Enable matrix backtesting (requires param_grid in config).")
-@click.option("--top-n", default=10, show_default=True, help="Show top N results in grid backtest.")
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Verbose output.")
-def backtest(config: Path, tearsheet: bool, output_dir: str | None, grid: bool, top_n: int, verbose: bool) -> None:
-    """Run a backtest from a YAML configuration file.
-
-    If --grid is set and the config contains param_grid entries, a Cartesian-product
-    parameter sweep is executed and results are sorted by total PnL.
-    """
+def backtest(config: Path, tearsheet: bool, output_dir: str | None, verbose: bool) -> None:
+    """Run a backtest from a YAML configuration file."""
     from trade_system_core.adapters import get_registry  # noqa: F401, PLC0415
 
     run_config = load_config(config)
 
-    # Initialize observability
     from trade_system_core.observability import init_observability  # noqa: PLC0415
 
     init_observability(run_config.observability)
@@ -49,16 +42,6 @@ def backtest(config: Path, tearsheet: bool, output_dir: str | None, grid: bool, 
         click.echo(f"  venues: {[v.name for v in run_config.venues]}")
         click.echo(f"  strategies: {[s.strategy_path for s in run_config.strategies]}")
 
-    has_grid = any(s.param_grid for s in run_config.strategies)
-
-    if grid and has_grid:
-        _run_grid_backtest(run_config, top_n, verbose)
-    else:
-        _run_single_backtest(run_config, tearsheet, output_dir, verbose)
-
-
-def _run_single_backtest(run_config, tearsheet: bool, output_dir: str | None, verbose: bool) -> None:
-    """Execute a standard (non-grid) backtest."""
     from trade_system_core.backtest import run_backtest  # noqa: PLC0415
 
     results = run_backtest(run_config, tearsheet=tearsheet, output_dir=output_dir)
@@ -83,43 +66,6 @@ def _run_single_backtest(run_config, tearsheet: bool, output_dir: str | None, ve
     if tearsheet:
         out = output_dir or ".tmp"
         click.echo(f"\nTearsheet(s) written to: {out}/tearsheet_*.html")
-
-
-def _run_grid_backtest(run_config, top_n: int, verbose: bool) -> None:
-    """Execute a grid (matrix) backtest."""
-    from trade_system_core.backtest import grid_backtest  # noqa: PLC0415
-
-    # Collect grid params from the first strategy that has them
-    for sc in run_config.strategies:
-        if sc.param_grid:
-            break
-    else:
-        click.echo("No param_grid found in config. Run with --grid only when param_grid is defined.")
-        return
-
-    dc = run_config.data[0]
-    grid_results = grid_backtest(
-        strategy_path=sc.strategy_path,
-        config_path=sc.config_path,
-        base_config=sc.config,
-        param_grid=sc.param_grid,
-        instrument_id=dc.instrument_id,
-        bar_type=dc.bar_type or "",
-        catalog_path=dc.catalog_path or "",
-        start_time=dc.start_time or "",
-        end_time=dc.end_time or "",
-        starting_balances=run_config.venues[0].starting_balances if run_config.venues else ["100_000 USD"],
-        fee_model=run_config.venues[0].fee_model if run_config.venues else None,
-    )
-
-    click.echo(f"\n========== Grid Backtest Results (top {top_n}) ==========")
-    click.echo(f"Total combinations: {len(grid_results)}")
-    click.echo("")
-    for idx, r in enumerate(grid_results[:top_n], 1):
-        click.echo(
-            f"#{idx}  params={r.params}  PnL={r.total_pnl}  "
-            f"Sharpe={r.sharpe_ratio}  DD={r.max_drawdown}  trades={r.total_trades}"
-        )
 
 
 @cli.command()
@@ -156,17 +102,13 @@ def live(config: Path, dry_run: bool, verbose: bool) -> None:
 @click.argument("config", type=click.Path(exists=True, path_type=Path))
 @click.option("--tearsheet", is_flag=True, default=False, help="Generate tearsheet (backtest only).")
 @click.option("--output-dir", default=None, help="Directory for HTML reports. Defaults to .tmp")
-@click.option("--grid", is_flag=True, default=False, help="Enable matrix backtesting.")
 @click.option("--dry-run", is_flag=True, default=False, help="Simulated trading (live only).")
-@click.option("--top-n", default=10, show_default=True, help="Top N grid results.")
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Verbose output.")
 def run(
     config: Path,
     tearsheet: bool,
     output_dir: str | None,
-    grid: bool,
     dry_run: bool,
-    top_n: int,
     verbose: bool,
 ) -> None:
     """Auto-detect mode from config and run.
@@ -184,8 +126,6 @@ def run(
             config=config,
             tearsheet=tearsheet,
             output_dir=output_dir,
-            grid=grid,
-            top_n=top_n,
             verbose=verbose,
         )
     elif mode == "live":

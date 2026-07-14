@@ -22,8 +22,7 @@ class TestCliCommands:
         result = runner.invoke(cli, ["backtest", "--help"])
         assert result.exit_code == 0
         assert "--tearsheet" in result.output
-        assert "--grid" in result.output
-        assert "--top-n" in result.output
+        assert "--output-dir" in result.output
 
     def test_live_help(self):  # noqa: D102
         runner = CliRunner()

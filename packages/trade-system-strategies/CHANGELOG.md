@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-strategies-0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/bdb51b35ac40fb41099fa0564a8cda2c06da4ec2..trade-system-strategies-0.4.0) - 2026-07-14
+#### Features
+- **(massive,strategies)** add option catalog loader + native BS greeks integration - ([ac2f4fa](https://github.com/shawndeng-homelab/trade-system/commit/ac2f4fa644e7b0065a2198e71119d54f07b4f970)) - ShawnDeng-code
+- **(strategies)** implement PMCC strategy lifecycle - ([bdb51b3](https://github.com/shawndeng-homelab/trade-system/commit/bdb51b35ac40fb41099fa0564a8cda2c06da4ec2)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-strategies-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/5d5aff68c15212709e74e087ded9d4463fe61002..trade-system-strategies-0.3.0) - 2026-07-06
 #### Features
 - add orb strategy - ([5d5aff6](https://github.com/shawndeng-homelab/trade-system/commit/5d5aff68c15212709e74e087ded9d4463fe61002)) - ShawnDeng-code

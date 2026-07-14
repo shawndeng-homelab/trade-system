@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-massive-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/ac2f4fa644e7b0065a2198e71119d54f07b4f970..trade-system-massive-0.2.0) - 2026-07-14
+#### Bug Fixes
+- **(massive)** normalize integer volumes to precision=0 - ([e785e89](https://github.com/shawndeng-homelab/trade-system/commit/e785e8920fc7c2fb6f7620279a8fc864120444fa)) - ShawnDeng-code
+#### Features
+- **(massive,strategies)** add option catalog loader + native BS greeks integration - ([ac2f4fa](https://github.com/shawndeng-homelab/trade-system/commit/ac2f4fa644e7b0065a2198e71119d54f07b4f970)) - ShawnDeng-code
+#### Refactoring
+- **(core)** remove grid/quick_backtest, use NAUTILUS_PATH for data catalog - ([93716d6](https://github.com/shawndeng-homelab/trade-system/commit/93716d64265f6012ebafe4c5a5e3bb94b1b78a03)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-massive-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/9a0b822f9c548db2d2231121d8a503a7a14c36eb..trade-system-massive-0.1.0) - 2026-07-04
 #### Features
 - **(massive)** register package in cog.toml and add SPY 1-min download script - ([83f5305](https://github.com/shawndeng-homelab/trade-system/commit/83f5305c3b3899cea09d19653cd05ca8a55756c8)) - ShawnDeng-code

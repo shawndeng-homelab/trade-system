@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [trade-system-core-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/6b36098ff7e1b033ffc17a2a35507efad84681c6..trade-system-core-0.2.0) - 2026-07-14
+#### Bug Fixes
+- **(core)** resolve data_cls aliases to NautilusTrader dotted paths - ([f661d42](https://github.com/shawndeng-homelab/trade-system/commit/f661d424152ff368b5a71a46c00a29847227bbf8)) - ShawnDeng-code
+- **(massive)** normalize integer volumes to precision=0 - ([e785e89](https://github.com/shawndeng-homelab/trade-system/commit/e785e8920fc7c2fb6f7620279a8fc864120444fa)) - ShawnDeng-code
+#### Features
+- **(core)** support option instruments in backtest data pipeline - ([6b36098](https://github.com/shawndeng-homelab/trade-system/commit/6b36098ff7e1b033ffc17a2a35507efad84681c6)) - ShawnDeng-code
+#### Refactoring
+- **(core)** remove grid/quick_backtest, use NAUTILUS_PATH for data catalog - ([93716d6](https://github.com/shawndeng-homelab/trade-system/commit/93716d64265f6012ebafe4c5a5e3bb94b1b78a03)) - ShawnDeng-code
+
+- - -
+
 ## [trade-system-core-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-core-0.1.0) - 2026-07-06
 #### Features
 - **(core)** default HTML reports to .tmp dir, support configurable output_dir - ([072afa6](https://github.com/shawndeng-homelab/trade-system/commit/072afa639d62039e568a15cdb981ca73163ffc5c)) - ShawnDeng-code

@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.8.0](https://github.com/shawndeng-homelab/trade-system/compare/93716d64265f6012ebafe4c5a5e3bb94b1b78a03..0.8.0) - 2026-07-14
+### Package updates
+- [trade-system-strategies-0.4.0](packages/trade-system-strategies) bumped to [trade-system-strategies-0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.3.0..trade-system-strategies-0.4.0)
+- [trade-system-core-0.2.0](packages/trade-system-core) bumped to [trade-system-core-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-core-0.1.1..trade-system-core-0.2.0)
+- [trade-system-massive-0.2.0](packages/trade-system-massive) bumped to [trade-system-massive-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-massive-0.1.1..trade-system-massive-0.2.0)
+### Global changes
+#### Bug Fixes
+- **(ci)** only publish packages with new version tags - ([fe70f87](https://github.com/shawndeng-homelab/trade-system/commit/fe70f87acc8529ec5cf758f06b14dc3d99fb8733)) - ShawnDeng-code
+- **(massive)** normalize integer volumes to precision=0 - ([e785e89](https://github.com/shawndeng-homelab/trade-system/commit/e785e8920fc7c2fb6f7620279a8fc864120444fa)) - ShawnDeng-code
+#### Features
+- **(core)** support option instruments in backtest data pipeline - ([6b36098](https://github.com/shawndeng-homelab/trade-system/commit/6b36098ff7e1b033ffc17a2a35507efad84681c6)) - ShawnDeng-code
+- **(massive,strategies)** add option catalog loader + native BS greeks integration - ([ac2f4fa](https://github.com/shawndeng-homelab/trade-system/commit/ac2f4fa644e7b0065a2198e71119d54f07b4f970)) - ShawnDeng-code
+- **(strategies)** implement PMCC strategy lifecycle - ([bdb51b3](https://github.com/shawndeng-homelab/trade-system/commit/bdb51b35ac40fb41099fa0564a8cda2c06da4ec2)) - ShawnDeng-code
+#### Refactoring
+- **(core)** remove grid/quick_backtest, use NAUTILUS_PATH for data catalog - ([93716d6](https://github.com/shawndeng-homelab/trade-system/commit/93716d64265f6012ebafe4c5a5e3bb94b1b78a03)) - ShawnDeng-code
+
+- - -
+
 ## [0.7.0](https://github.com/shawndeng-homelab/trade-system/compare/5d5aff68c15212709e74e087ded9d4463fe61002..0.7.0) - 2026-07-06
 ### Package updates
 - [trade-system-core](packages/trade-system-core) bumped to [trade-system-core-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..trade-system-core-0.1.0)

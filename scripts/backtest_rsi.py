@@ -1,54 +1,96 @@
 """Backtest the RSI double-touch strategy on SPY hourly bars.
 
-Uses the :func:`~trade_system_core.backtest.quick_backtest` shorthand.
+Uses NautilusTrader's BacktestEngine directly.
 
 Run:
     uv run --all-packages python scripts/backtest_rsi.py
 """
 
+import os
 from decimal import Decimal
 
-from trade_system_core import quick_backtest
+from nautilus_trader.backtest.config import BacktestDataConfig
+from nautilus_trader.backtest.engine import BacktestEngine
+from nautilus_trader.backtest.engine import BacktestEngineConfig
+from nautilus_trader.backtest.node import BacktestNode
+from nautilus_trader.config import ImportableStrategyConfig
+from nautilus_trader.model.enums import AccountType
+from nautilus_trader.model.enums import OmsType
+from nautilus_trader.model.identifiers import TraderId
+from nautilus_trader.model.identifiers import Venue
+from nautilus_trader.model.objects import Money
+from nautilus_trader.persistence.catalog import ParquetDataCatalog
 
 
 def main() -> None:
     """Run the RSI backtest and print the result summary."""
-    result = quick_backtest(
-        strategy_path="trade_system_strategies.rsi.strategy:RsiStrategy",
-        config_path="trade_system_strategies.rsi.config:RsiConfig",
-        strategy_config={
-            "instrument_id": "SPY.ARCX",
-            "bar_type": "SPY.ARCX-1-MINUTE-LAST-EXTERNAL",
-            "rsi_period": 14,
-            "upper_level": 0.70,
-            "lower_level": 0.30,
-            "midline": 0.50,
-            "trade_size": str(Decimal("100")),
-        },
-        instrument_id="SPY.ARCX",
-        bar_type="SPY.ARCX-1-MINUTE-LAST-EXTERNAL",
-        catalog_path=".",
-        start_time="2026-01-02T00:00:00+00:00",
-        end_time="2026-06-30T00:00:00+00:00",
-        starting_balances=["10_000 USD"],
-        tearsheet=True,
-        output_dir=".tmp",
+    catalog_path = os.environ.get("NAUTILUS_PATH", ".")
+    catalog = ParquetDataCatalog(catalog_path)
+
+    engine = BacktestEngine(
+        config=BacktestEngineConfig(
+            trader_id=TraderId("RSI-BT-001"),
+            strategies=[
+                ImportableStrategyConfig(
+                    strategy_path="trade_system_strategies.rsi.strategy:RsiStrategy",
+                    config_path="trade_system_strategies.rsi.config:RsiConfig",
+                    config={
+                        "instrument_id": "SPY.ARCX",
+                        "bar_type": "SPY.ARCX-1-MINUTE-LAST-EXTERNAL",
+                        "rsi_period": 14,
+                        "upper_level": 0.70,
+                        "lower_level": 0.30,
+                        "midline": 0.50,
+                        "trade_size": str(Decimal("100")),
+                    },
+                ),
+            ],
+            run_analysis=True,
+        ),
     )
 
+    engine.add_venue(
+        venue=Venue("ARCX"),
+        oms_type=OmsType.NETTING,
+        account_type=AccountType.MARGIN,
+        starting_balances=[Money.from_str("10_000 USD")],
+    )
+
+    # Load instruments from catalog
+    for instrument in catalog.instruments(instrument_ids=["SPY.ARCX"]):
+        engine.add_instrument(instrument)
+
+    # Load bar data
+    bar_config = BacktestDataConfig(
+        catalog_path=catalog_path,
+        data_cls="nautilus_trader.model.data:Bar",
+        instrument_id="SPY.ARCX",
+        bar_spec="1-MINUTE",
+        start_time="2026-01-02T00:00:00+00:00",
+        end_time="2026-06-30T00:00:00+00:00",
+    )
+    result = BacktestNode.load_data_config(bar_config)
+    if result.data:
+        engine.add_data(result.data, sort=False)
+
+    engine.sort_data()
+    engine.run(start="2026-01-02T00:00:00+00:00", end="2026-06-30T00:00:00+00:00")
+
+    bt = engine.get_result()
     print("\n========== RSI Backtest Result ==========")
-    print(f"run_id:          {result.run_id}")
-    print(f"backtest range:  {result.backtest_start} -> {result.backtest_end}")
-    print(f"elapsed (s):     {result.elapsed_time:.2f}")
-    print(f"total events:    {result.total_events}")
-    print(f"total orders:    {result.total_orders}")
-    print(f"total positions: {result.total_positions}")
+    print(f"run_id:          {bt.run_id}")
+    print(f"backtest range:  {bt.backtest_start} -> {bt.backtest_end}")
+    print(f"elapsed (s):     {bt.elapsed_time:.2f}")
+    print(f"total events:    {bt.total_events}")
+    print(f"total orders:    {bt.total_orders}")
+    print(f"total positions: {bt.total_positions}")
 
     print("\n--- summary ---")
-    for key, value in result.summary.items():
+    for key, value in bt.summary.items():
         print(f"{key}: {value}")
 
     print("\n--- PnL stats ---")
-    for currency, stats in result.stats_pnls.items():
+    for currency, stats in bt.stats_pnls.items():
         print(f"[{currency}] {stats}")
 
 

@@ -88,17 +88,12 @@ class StrategyConfig(msgspec.Struct, frozen=True):
         config_path: Dotted path to the config class
             (e.g. ``"trade_system_strategies.rsi.config:RsiConfig"``).
         config: Strategy-specific parameters.
-        param_grid: Parameter grid for matrix backtesting.  Keys are strategy
-            config field names; values are lists of candidate values.  The
-            runner computes the Cartesian product and runs one backtest per
-            combination.
 
     """
 
     strategy_path: str = ""
     config_path: str = ""
     config: dict[str, Any] = msgspec.field(default_factory=dict)
-    param_grid: dict[str, list] | None = None
 
 
 class ObservabilityConfig(msgspec.Struct, frozen=True):

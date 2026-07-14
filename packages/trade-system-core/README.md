@@ -1,13 +1,12 @@
 # trade-system-core
 
-Unified runner for backtest, live trading, and parameter optimisation with OpenTelemetry observability.
+Unified runner for backtest and live trading with OpenTelemetry observability.
 
 ## Features
 
 - **YAML-driven configuration** — declare venues, data sources, strategies, and observability in a single config file
 - **CLI entry point** — `trade-system backtest`, `trade-system live`, `trade-system run`
-- **Quick backtest** — `quick_backtest()` shorthand for single-strategy runs
-- **Grid backtest** — `grid_backtest()` Cartesian-product parameter sweep for optimisation
+- **Backtest runner** — `run_backtest()` from a `RunConfig` for full control
 - **Live trading** — `run_live()` with pluggable data/execution adapters
 - **Dry-run mode** — `--dry-run` for simulated trading with real data
 - **Slippage & latency models** — configurable fill model and latency model per venue
@@ -22,9 +21,6 @@ Unified runner for backtest, live trading, and parameter optimisation with OpenT
 # Backtest from YAML config
 uv run --all-packages trade-system backtest configs/rsi_backtest.yaml
 
-# Grid (matrix) backtest for parameter optimisation
-uv run --all-packages trade-system backtest configs/rsi_grid_backtest.yaml --grid
-
 # Live trading
 uv run --all-packages trade-system live configs/live.yaml
 
@@ -38,35 +34,17 @@ uv run --all-packages trade-system run configs/rsi_backtest.yaml
 ### Python API
 
 ```python
-from trade_system_core import quick_backtest, grid_backtest
+from trade_system_core import run_backtest
+from trade_system_core.config import load_config
 
-# Single-strategy shorthand
-result = quick_backtest(
-    strategy_path="trade_system_strategies.rsi.strategy:RsiStrategy",
-    config_path="trade_system_strategies.rsi.config:RsiConfig",
-    strategy_config={"instrument_id": "SPY.ARCA", "rsi_period": 14},
-    instrument_id="SPY.ARCA",
-    bar_type="SPY.ARCA-1-MINUTE-LAST-EXTERNAL",
-    catalog_path=".",
-    start_time="2026-01-01T00:00:00+00:00",
-    end_time="2026-06-30T00:00:00+00:00",
-)
-
-# Parameter sweep
-results = grid_backtest(
-    strategy_path="trade_system_strategies.rsi.strategy:RsiStrategy",
-    config_path="trade_system_strategies.rsi.config:RsiConfig",
-    base_config={"instrument_id": "SPY.ARCA"},
-    param_grid={"rsi_period": [10, 14, 20], "upper_level": [0.65, 0.70, 0.75]},
-    instrument_id="SPY.ARCA",
-    bar_type="SPY.ARCA-1-MINUTE-LAST-EXTERNAL",
-    catalog_path=".",
-    start_time="2026-01-01T00:00:00+00:00",
-    end_time="2026-06-30T00:00:00+00:00",
-)
-for r in results[:5]:
-    print(f"{r.params} → PnL={r.total_pnl} DD={r.max_drawdown}")
+# Run from a YAML config
+config = load_config("configs/rsi_backtest.yaml")
+results = run_backtest(config, tearsheet=True)
 ```
+
+For simple single-strategy backtests or multi-venue setups, use NautilusTrader's
+`BacktestEngine` directly — see `scripts/backtest_rsi.py` and `scripts/backtest_pmcc.py`
+for examples.
 
 ### OTel Instrumentation
 
@@ -109,31 +87,6 @@ strategies:
     config:
       instrument_id: SPY.ARCA
       rsi_period: 14
-```
-
-### Grid Backtest (parameter sweep)
-
-```yaml
-mode: backtest
-venues:
-  - name: ARCA
-    starting_balances: ["10_000 USD"]
-    fee_model: ibkr_tiered
-data:
-  - catalog_path: "."
-    instrument_id: SPY.ARCA
-    bar_type: "SPY.ARCA-1-MINUTE-LAST-EXTERNAL"
-    start_time: "2026-01-02T00:00:00+00:00"
-    end_time: "2026-06-30T00:00:00+00:00"
-strategies:
-  - strategy_path: "trade_system_strategies.rsi.strategy:RsiStrategy"
-    config_path: "trade_system_strategies.rsi.config:RsiConfig"
-    config:
-      instrument_id: SPY.ARCA
-    param_grid:
-      rsi_period: [10, 14, 20]
-      upper_level: [0.65, 0.70, 0.75]
-      lower_level: [0.25, 0.30, 0.35]
 ```
 
 ### Live (Massive data + Binance execution)

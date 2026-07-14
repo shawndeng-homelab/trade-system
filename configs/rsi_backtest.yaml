@@ -13,7 +13,7 @@ venues:
         prob_fill_on_limit: 0.9
         prob_slippage: 0.05
 data:
-  - catalog_path: "."
+  - catalog_path: ""
     instrument_id: SPY.ARCX
     bar_type: "SPY.ARCX-1-MINUTE-LAST-EXTERNAL"
     start_time: "2026-01-02T00:00:00+00:00"

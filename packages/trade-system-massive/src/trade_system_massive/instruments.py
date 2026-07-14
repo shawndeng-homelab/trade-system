@@ -35,6 +35,7 @@ from trade_system_massive.common import is_option_ticker
 from trade_system_massive.common import option_kind_from_contract_type
 from trade_system_massive.common import ticker_to_venue
 from trade_system_massive.constants import DEFAULT_FUTURES_VENUE
+from trade_system_massive.constants import OPTION_TICKER_PREFIX
 from trade_system_massive.parsing import decimal_or_default
 from trade_system_massive.parsing import parse_date_to_start_ns
 from trade_system_massive.parsing import parse_expiration_ns
@@ -362,7 +363,11 @@ class MassiveInstrumentProvider(InstrumentProvider):
         ticker = getattr(contract, "ticker", None)
         if not ticker:
             return None
-        instrument_id = self._instrument_id_for(ticker)
+        # Strip the "O:" prefix from the symbol to avoid Windows path issues
+        # (NautilusTrader uses the symbol as a directory name in the parquet catalog).
+        # The full Massive ticker (with "O:") is preserved in raw_symbol and info.
+        symbol_str = ticker.removeprefix(OPTION_TICKER_PREFIX)
+        instrument_id = InstrumentId(Symbol(symbol_str), ticker_to_venue(ticker))
         expiration_ns = parse_expiration_ns(getattr(contract, "expiration_date", None))
         if expiration_ns == 0:
             self._log.warning(f"Option {ticker} has unparseable expiration; skipping")
@@ -371,7 +376,11 @@ class MassiveInstrumentProvider(InstrumentProvider):
         shares = int(getattr(contract, "shares_per_contract", 0) or DEFAULT_SHARES_PER_CONTRACT)
         multiplier = Quantity.from_int(shares)
         strike = decimal_or_default(getattr(contract, "strike_price", None), None)
-        ts = self._clock.timestamp_ns()
+        # Use activation_ns as ts_event so that the instrument falls within the
+        # backtest time window when loaded from a catalog.  Using the live clock
+        # timestamp would place ts_event at download time, causing BacktestDataConfig
+        # start_time/end_time filters to exclude the instrument from historical runs.
+        ts = activation_ns if activation_ns > 0 else self._clock.timestamp_ns()
         return OptionContract(
             instrument_id=instrument_id,
             raw_symbol=Symbol(ticker),
@@ -393,6 +402,7 @@ class MassiveInstrumentProvider(InstrumentProvider):
                 "exercise_style": getattr(contract, "exercise_style", None),
                 "cfi": getattr(contract, "cfi", None),
                 "shares_per_contract": shares,
+                "massive_ticker": ticker,  # Full O:-prefixed ticker for REST calls
             },
         )
 

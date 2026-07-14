@@ -62,24 +62,15 @@ class TestDataConfig:
 
 
 class TestStrategyConfig:
-    """Tests for StrategyConfig with and without param_grid."""
+    """Tests for StrategyConfig."""
 
-    def test_no_grid(self):  # noqa: D102
+    def test_basic(self):  # noqa: D102
         sc = StrategyConfig(
             strategy_path="foo:Bar",
             config_path="foo:Baz",
             config={"x": 1},
         )
-        assert sc.param_grid is None
-
-    def test_with_grid(self):  # noqa: D102
-        sc = StrategyConfig(
-            strategy_path="foo:Bar",
-            config_path="foo:Baz",
-            config={"x": 1},
-            param_grid={"rsi_period": [10, 14, 20]},
-        )
-        assert sc.param_grid["rsi_period"] == [10, 14, 20]
+        assert sc.config == {"x": 1}
 
 
 class TestLoadConfig:
@@ -130,8 +121,6 @@ strategies:
     config_path: "trade_system_strategies.rsi.config:RsiConfig"
     config:
       instrument_id: "BTC/USDT.BINANCE"
-    param_grid:
-      rsi_period: [10, 14]
 observability:
   enabled: true
   otlp_endpoint: "http://otel-collector:4317"
@@ -148,7 +137,6 @@ dry_run: true
         assert config.venues[0].exec_client == "BINANCE"
         assert config.data[0].data_client == "MASSIVE"
         assert "MASSIVE" in config.data_clients
-        assert config.strategies[0].param_grid == {"rsi_period": [10, 14]}
         assert config.observability.otlp_endpoint == "http://otel-collector:4317"
 
     def test_fill_model_in_yaml(self):  # noqa: D102

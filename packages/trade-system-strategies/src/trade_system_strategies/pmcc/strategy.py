@@ -549,7 +549,7 @@ class PMCCStrategy(Strategy):
             if self._config.leaps_max_dte is not None and dte > self._config.leaps_max_dte:
                 continue
             delta = self._estimate_delta(inst, spot)
-            mid = self._get_option_mid(inst)
+            mid = self._get_option_mid(inst, spot)
             oi = self._get_open_interest(inst)
             candidates.append(
                 OptionCandidate(
@@ -576,7 +576,7 @@ class PMCCStrategy(Strategy):
             if self._config.short_max_dte is not None and dte > self._config.short_max_dte:
                 continue
             delta = self._estimate_delta(inst, spot)
-            mid = self._get_option_mid(inst)
+            mid = self._get_option_mid(inst, spot)
             oi = self._get_open_interest(inst)
             candidates.append(
                 OptionCandidate(
@@ -645,11 +645,11 @@ class PMCCStrategy(Strategy):
         dte = self._compute_dte(inst.expiration_ns)
         return approx_call_delta(strike, spot, dte)
 
-    def _get_option_mid(self, inst: OptionContract) -> Decimal:
+    def _get_option_mid(self, inst: OptionContract, spot: Decimal) -> Decimal:
         """Get the mid price for an option instrument.
 
-        Attempts to read from the cache (last bar); falls back to an intrinsic
-        value approximation.
+        Attempts to read from the cache (last bar); falls back to a
+        Black-Scholes theoretical price estimate.
         """
         # Try cache for a recent bar
         bar_type_str = f"{inst.id}-1-HOUR-LAST-EXTERNAL"
@@ -660,7 +660,14 @@ class PMCCStrategy(Strategy):
                 return bar.close.as_decimal()
         except Exception:
             pass
-        return Decimal("0")
+        # Fallback: BS theoretical price
+        strike = inst.strike_price.as_decimal()
+        dte = self._compute_dte(inst.expiration_ns)
+        if inst.option_kind == OptionKind.CALL:
+            return bs_call_price(spot, strike, dte)
+        # Put via put-call parity: P = C - S + K
+        call_price = bs_call_price(spot, strike, dte)
+        return call_price - spot + strike
 
     def _get_open_interest(self, inst: OptionContract) -> int:
         """Extract open interest from the instrument info dict, if present."""

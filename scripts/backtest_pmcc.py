@@ -1,145 +1,73 @@
-"""Backtest the PMCC (Poor Man's Covered Call) strategy on SPY.
+"""Backtest the PMCC (Poor Man's Covered Call) strategy on SPY via optopsy.
 
-Uses NautilusTrader's BacktestEngine directly (the recommended API for
-full control over venue registration, instrument loading, and data
-streaming).
+Requires pre-downloaded data::
 
-Run:
+    EODHD_API_KEY=... optopsy-data download SPY        # options
+    optopsy-data download SPY -s                       # stock OHLCV
+
+Run::
+
     uv run --all-packages python scripts/backtest_pmcc.py
 """
 
-import os
-from decimal import Decimal
-
-from nautilus_trader.backtest.config import BacktestDataConfig
-from nautilus_trader.backtest.engine import BacktestEngine
-from nautilus_trader.backtest.engine import BacktestEngineConfig
-from nautilus_trader.backtest.node import BacktestNode
-from nautilus_trader.config import ImportableStrategyConfig
-from nautilus_trader.model.enums import AccountType
-from nautilus_trader.model.enums import OmsType
-from nautilus_trader.model.identifiers import TraderId
-from nautilus_trader.model.identifiers import Venue
-from nautilus_trader.model.objects import Money
-from nautilus_trader.persistence.catalog import ParquetDataCatalog
-
-
-# ── Configuration ────────────────────────────────────────────────────────
-
-START_TIME = "2026-01-02T00:00:00+00:00"
-END_TIME = "2026-06-30T00:00:00+00:00"
-
-STRATEGY_CONFIG = {
-    "underlying": "SPY.ARCX",
-    "bar_type": "SPY.ARCX-1-HOUR-LAST-EXTERNAL",
-    "leaps_target_delta": str(Decimal("0.80")),
-    "leaps_min_dte": 60,
-    "leaps_max_dte": None,
-    "leaps_quantity": str(Decimal("1")),
-    "leaps_roll_when_dte": 90,
-    "leaps_roll_when_delta_below": str(Decimal("0.70")),
-    "short_target_delta": str(Decimal("0.30")),
-    "short_min_dte": 7,
-    "short_max_dte": 45,
-    "short_quantity": str(Decimal("1")),
-    "short_delta_tolerance": None,
-    "short_roll_dte": 7,
-    "short_roll_pnl": str(Decimal("0.50")),
-    "short_roll_min_pnl": str(Decimal("0.25")),
-    "short_close_at_pnl": str(Decimal("0.90")),
-    "short_always_roll_when_itm": True,
-    "short_credit_only": False,
-    "short_maintain_high_water_mark": True,
-    "close_positions_on_stop": True,
-}
-
-
-# ── Main ──────────────────────────────────────────────────────────────────
+from options_strategies.pmcc import PmccConfig
+from options_strategies.pmcc import run_pmcc
+from options_strategies.shared import load_pmcc_data
 
 
 def main() -> None:
     """Run the PMCC backtest and print the result summary."""
-    catalog_path = os.environ.get("NAUTILUS_PATH", ".")
-    catalog = ParquetDataCatalog(catalog_path)
-
-    # ── 1. Engine ─────────────────────────────────────────────────────
-    engine = BacktestEngine(
-        config=BacktestEngineConfig(
-            trader_id=TraderId("PMCC-BT-001"),
-            strategies=[
-                ImportableStrategyConfig(
-                    strategy_path="trade_system_strategies.pmcc.strategy:PMCCStrategy",
-                    config_path="trade_system_strategies.pmcc.config:PMCCConfig",
-                    config=STRATEGY_CONFIG,
-                ),
-            ],
-            run_analysis=True,
-        ),
+    config = PmccConfig(
+        symbol="SPY",
+        capital=100_000.0,
+        # LEAPS: deep-ITM, far expiry
+        leaps_delta=0.80,
+        leaps_max_entry_dte=365,
+        leaps_exit_dte=30,
+        # Short call: near-term, 80% profit exit
+        short_delta=0.30,
+        short_max_entry_dte=45,
+        short_exit_dte=7,
+        short_take_profit=0.8,
     )
 
-    # ── 2. Venues ─────────────────────────────────────────────────────
-    # ARCX: 主交易 venue (SPY equity)
-    engine.add_venue(
-        venue=Venue("ARCX"),
-        oms_type=OmsType.NETTING,
-        account_type=AccountType.MARGIN,
-        starting_balances=[Money.from_str("100_000 USD")],
+    print(f"Loading data for {config.symbol}…")
+    options, stock = load_pmcc_data(
+        config.symbol,
+        start_date=config.start_date,
+        end_date=config.end_date,
+        expiration_type=config.expiration_type,
     )
-    # OPRA: 期权 venue (US equity options)
-    engine.add_venue(
-        venue=Venue("OPRA"),
-        oms_type=OmsType.NETTING,
-        account_type=AccountType.MARGIN,
-        starting_balances=[Money.from_str("0 USD")],
-    )
-    # XCME: 期货 venue (if catalog contains futures instruments)
-    engine.add_venue(
-        venue=Venue("XCME"),
-        oms_type=OmsType.NETTING,
-        account_type=AccountType.MARGIN,
-        starting_balances=[Money.from_str("0 USD")],
-    )
+    print(f"  Options: {len(options):,} rows")
+    print(f"  Stock:   {len(stock):,} rows")
 
-    # ── 3. Instruments ────────────────────────────────────────────────
-    # Load all instruments from the catalog; add_instrument() handles
-    # Equity, OptionContract, and FuturesContract uniformly.
-    for instrument in catalog.instruments():
-        engine.add_instrument(instrument)
+    print("Running PMCC backtest…")
+    result = run_pmcc(options, stock, config)
 
-    # ── 4. Bar data ──────────────────────────────────────────────────
-    bar_config = BacktestDataConfig(
-        catalog_path=catalog_path,
-        data_cls="nautilus_trader.model.data:Bar",
-        instrument_id="SPY.ARCX",
-        bar_spec="1-HOUR",
-        start_time=START_TIME,
-        end_time=END_TIME,
-    )
-    result = BacktestNode.load_data_config(bar_config)
-    if result.data:
-        engine.add_data(result.data, sort=False)
+    # ── Summary ────────────────────────────────────────────────────────────
+    s = result.summary
+    print("\n═══ PMCC Portfolio Summary ═══")
+    print(f"  Total trades:    {s.get('total_trades', 0)}")
+    print(f"  Win rate:        {s.get('win_rate', 0):.1%}")
+    print(f"  Total P&L:       ${s.get('total_pnl', 0):,.2f}")
+    print(f"  Max drawdown:    {s.get('max_drawdown', 0):.2%}")
+    print(f"  Sharpe ratio:    {s.get('sharpe_ratio', 0):.2f}")
+    print(f"  Sortino ratio:   {s.get('sortino_ratio', 0):.2f}")
+    print(f"  Profit factor:   {s.get('profit_factor', 0):.2f}")
+    print(f"  Avg days held:   {s.get('avg_days_in_trade', 0):.1f}")
 
-    # ── 5. Run ────────────────────────────────────────────────────────
-    engine.sort_data()
-    engine.run(start=START_TIME, end=END_TIME)
+    # ── Per-leg results ────────────────────────────────────────────────────
+    for name, leg in result.leg_results.items():
+        ls = leg.summary
+        print(f"\n  ── {name} leg ──")
+        print(f"    Trades: {ls.get('total_trades', 0)}  "
+              f"Win rate: {ls.get('win_rate', 0):.1%}  "
+              f"P&L: ${ls.get('total_pnl', 0):,.2f}")
 
-    # ── 6. Result ─────────────────────────────────────────────────────
-    bt = engine.get_result()
-    print("\n========== PMCC Backtest Result ==========")
-    print(f"run_id:          {bt.run_id}")
-    print(f"backtest range:  {bt.backtest_start} -> {bt.backtest_end}")
-    print(f"elapsed (s):     {bt.elapsed_time:.2f}")
-    print(f"total events:    {bt.total_events}")
-    print(f"total orders:    {bt.total_orders}")
-    print(f"total positions: {bt.total_positions}")
-
-    print("\n--- summary ---")
-    for key, value in bt.summary.items():
-        print(f"{key}: {value}")
-
-    print("\n--- PnL stats ---")
-    for currency, stats in bt.stats_pnls.items():
-        print(f"[{currency}] {stats}")
+    # ── Trade log sample ───────────────────────────────────────────────────
+    if not result.trade_log.empty:
+        print("\n  Sample trades (first 5):")
+        print(result.trade_log.head().to_string(index=False))
 
 
 if __name__ == "__main__":

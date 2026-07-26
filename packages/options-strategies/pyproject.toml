@@ -1,0 +1,16 @@
+[project]
+name = "options-strategies"
+version = "0.1.0"
+description = "Options backtesting strategies (PMCC) powered by optopsy"
+readme = "README.md"
+authors = [
+    { name = "ShawnDeng-code", email = "shawndeng1109@qq.com" }
+]
+requires-python = ">=3.12, <3.14"
+dependencies = [
+    "optopsy[data]>=2.3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

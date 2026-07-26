@@ -20,15 +20,24 @@ def main() -> None:
     config = PmccConfig(
         symbol="SPY",
         capital=100_000.0,
+        quantity=1,
+        multiplier=100,
+        max_positions=1,
         # LEAPS: deep-ITM, far expiry
         leaps_delta=0.80,
+        leaps_delta_min=0.75,
+        leaps_delta_max=0.80,
         leaps_max_entry_dte=365,
         leaps_exit_dte=30,
         # Short call: near-term, 80% profit exit
         short_delta=0.30,
+        short_delta_min=0.20,
+        short_delta_max=0.30,
         short_max_entry_dte=45,
         short_exit_dte=7,
         short_take_profit=0.8,
+        leaps_weight=0.6,
+        short_weight=0.4,
     )
 
     print(f"Loading data for {config.symbol}…")
@@ -68,6 +77,15 @@ def main() -> None:
     if not result.trade_log.empty:
         print("\n  Sample trades (first 5):")
         print(result.trade_log.head().to_string(index=False))
+
+    # ── Visualizations ─────────────────────────────────────────────────────
+    try:
+        from pmcc_charts import plot_portfolio
+
+        out = plot_portfolio(result, config.capital)
+        print(f"\n  📊 Charts written to: {out}")
+    except ImportError:
+        print("\n  (install plotly to enable charts: uv pip install plotly)")
 
 
 if __name__ == "__main__":

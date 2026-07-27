@@ -70,9 +70,11 @@ def main() -> None:
     for name, leg in result.leg_results.items():
         ls = leg.summary
         print(f"\n  ── {name} leg ──")
-        print(f"    Trades: {ls.get('total_trades', 0)}  "
-              f"Win rate: {ls.get('win_rate', 0):.1%}  "
-              f"P&L: ${ls.get('total_pnl', 0):,.2f}")
+        print(
+            f"    Trades: {ls.get('total_trades', 0)}  "
+            f"Win rate: {ls.get('win_rate', 0):.1%}  "
+            f"P&L: ${ls.get('total_pnl', 0):,.2f}"
+        )
         # Show early-exit breakdown
         tl = leg.trade_log
         if not tl.empty and "exit_type" in tl.columns:

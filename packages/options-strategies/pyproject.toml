@@ -1,6 +1,6 @@
 [project]
 name = "options-strategies"
-version = "0.1.0"
+version = "0.2.0"
 description = "Options backtesting strategies (PMCC) powered by optopsy"
 readme = "README.md"
 authors = [

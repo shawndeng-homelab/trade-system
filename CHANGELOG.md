@@ -2,6 +2,28 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.10.0](https://github.com/shawndeng-homelab/trade-system/compare/f691951683dcf956fe6f443e3bbfcd9e46917340..0.10.0) - 2026-07-27
+### Package updates
+- [options-strategies-0.2.0](packages/options-strategies) bumped to [options-strategies-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/options-strategies-0.1.0..options-strategies-0.2.0)
+- [backtest-charts](packages/backtest-charts) bumped to [backtest-charts-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..backtest-charts-0.1.0)
+### Global changes
+#### Bug Fixes
+- make charts interactive and responsive in HTML - ([6cf0f0c](https://github.com/shawndeng-homelab/trade-system/commit/6cf0f0ca445e70be86380723a5c48dabdbca6e27)) - ShawnDeng-code
+- enable alt.renderers.jupyter for interactive charts in notebook - ([55ca1ad](https://github.com/shawndeng-homelab/trade-system/commit/55ca1ad7cb0ebef289d81264c71ba793b6992a7d)) - ShawnDeng-code
+- use fixed width 580px instead of container for chart rendering - ([d1aa403](https://github.com/shawndeng-homelab/trade-system/commit/d1aa4035666d97cbb78047d990092174f6ea5f36)) - ShawnDeng-code
+- remove jupyter renderer, fix P&L dist X-axis density - ([faabfa4](https://github.com/shawndeng-homelab/trade-system/commit/faabfa44af078ce6f505c2595599675fa5d0843d)) - ShawnDeng-code
+- remove point=True and xOffset for VS Code notebook compat - ([5c4b9b0](https://github.com/shawndeng-homelab/trade-system/commit/5c4b9b098b3708a0807bba78627fb666ae94856c)) - ShawnDeng-code
+#### Features
+- add 'just add-package' recipe using repo-scaffold - ([928b601](https://github.com/shawndeng-homelab/trade-system/commit/928b6014d3b4737ed7e33645d24c069d923e8558)) - ShawnDeng-code
+- add backtest-charts package with Altair visualizations - ([edb5a1b](https://github.com/shawndeng-homelab/trade-system/commit/edb5a1ba2227904849c4006cea9205af01d14efc)) - ShawnDeng-code
+- convert backtest_pmcc.py to notebook, add jupyter dep group - ([f18697f](https://github.com/shawndeng-homelab/trade-system/commit/f18697f6c7075481e11613071240459132c716eb)) - ShawnDeng-code
+- load .env in notebook via python-dotenv - ([037133b](https://github.com/shawndeng-homelab/trade-system/commit/037133b2db1d3f3507713efc13e03a1b3b703527)) - ShawnDeng-code
+- rebase - ([f691951](https://github.com/shawndeng-homelab/trade-system/commit/f691951683dcf956fe6f443e3bbfcd9e46917340)) - ShawnDeng-code
+#### Tests
+- rewrite chart tests with real PortfolioResult fixture - ([ce5f3a5](https://github.com/shawndeng-homelab/trade-system/commit/ce5f3a5c2c9b07dc36a53d3adb8d7125457a1659)) - ShawnDeng-code
+
+- - -
+
 ## [0.9.0](https://github.com/shawndeng-homelab/trade-system/compare/dd459b5573ae84a075de963be0547c57140f0323..0.9.0) - 2026-07-27
 ### Package updates
 - [options-strategies](packages/options-strategies) bumped to [options-strategies-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..options-strategies-0.1.0)

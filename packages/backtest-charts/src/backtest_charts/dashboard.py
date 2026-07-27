@@ -64,5 +64,6 @@ def plot_portfolio(
     """
     chart = plot_dashboard(result, initial_capital)
     out_abs = os.path.abspath(out_path)
-    chart.save(out_abs)
+    # actions=True enables the vega-embed toolbar (export PNG/SVG, view spec)
+    chart.save(out_abs, embed_options={"actions": True})
     return out_abs

@@ -35,5 +35,5 @@ def plot_exit_breakdown(result) -> alt.Chart:
                 alt.Tooltip("count:Q", title="Count"),
             ],
         )
-        .properties(title="Exit Type Breakdown", width="container", height=280)
+        .properties(title="Exit Type Breakdown", width=580, height=280)
     )

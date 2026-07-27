@@ -27,7 +27,6 @@ from nautilus_trader.model.instruments import Instrument
 from nautilus_trader.model.instruments import OptionContract
 from nautilus_trader.model.orders import MarketOrder
 from nautilus_trader.trading.strategy import Strategy
-
 from trade_system_strategies.pmcc.config import PMCCConfig
 from trade_system_strategies.pmcc.signals import PMCCAction
 from trade_system_strategies.pmcc.signals import pmcc_entry_decision

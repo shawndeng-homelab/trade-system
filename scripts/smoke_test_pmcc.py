@@ -1,10 +1,9 @@
 """Smoke test: verify run_pmcc works end-to-end with synthetic data."""
 
-import pandas as pd
 import numpy as np
-
-from options_strategies.pmcc import PmccConfig, run_pmcc
-from options_strategies.pmcc.signals import leaps_entry_dates, short_call_entry_dates
+import pandas as pd
+from options_strategies.pmcc import PmccConfig
+from options_strategies.pmcc import run_pmcc
 
 
 def _synthetic_options() -> pd.DataFrame:

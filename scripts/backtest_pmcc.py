@@ -33,9 +33,10 @@ def main() -> None:
         short_delta=0.30,
         short_delta_min=0.20,
         short_delta_max=0.30,
-        short_max_entry_dte=45,
+        short_max_entry_dte=30,
         short_exit_dte=7,
         short_take_profit=0.8,
+        short_stop_loss=-0.11,
         leaps_weight=0.6,
         short_weight=0.4,
     )
@@ -72,6 +73,12 @@ def main() -> None:
         print(f"    Trades: {ls.get('total_trades', 0)}  "
               f"Win rate: {ls.get('win_rate', 0):.1%}  "
               f"P&L: ${ls.get('total_pnl', 0):,.2f}")
+        # Show early-exit breakdown
+        tl = leg.trade_log
+        if not tl.empty and "exit_type" in tl.columns:
+            for exit_type in sorted(tl["exit_type"].unique()):
+                count = (tl["exit_type"] == exit_type).sum()
+                print(f"    {exit_type}: {count}")
 
     # ── Trade log sample ───────────────────────────────────────────────────
     if not result.trade_log.empty:

@@ -3,11 +3,9 @@
 from options_strategies.pmcc import PmccConfig
 from options_strategies.pmcc import leaps_entry_dates
 from options_strategies.pmcc import run_pmcc
-from options_strategies.pmcc import short_call_entry_dates
 from options_strategies.pmcc.config import PmccConfig as ConfigDirect
 from options_strategies.pmcc.signals import leaps_entry_dates as leaps_direct
 from options_strategies.pmcc.strategy import run_pmcc as run_direct
-from options_strategies.shared import load_pmcc_data
 
 
 def test_pmcc_config_defaults() -> None:

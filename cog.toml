@@ -32,3 +32,11 @@ changelog_path = "packages/options-strategies/CHANGELOG.md"
 pre_bump_hooks = [
     "uv version --package options-strategies {{version}}",
 ]
+
+[packages.backtest-charts]
+path = "packages/backtest-charts"
+public_api = true
+changelog_path = "packages/backtest-charts/CHANGELOG.md"
+pre_bump_hooks = [
+    "uv version --package backtest-charts {{version}}",
+]

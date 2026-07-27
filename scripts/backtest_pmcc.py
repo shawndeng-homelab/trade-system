@@ -10,6 +10,7 @@ Run::
     uv run --all-packages python scripts/backtest_pmcc.py
 """
 
+from backtest_charts import plot_portfolio
 from options_strategies.pmcc import PmccConfig
 from options_strategies.pmcc import run_pmcc
 from options_strategies.shared import load_pmcc_data
@@ -88,13 +89,8 @@ def main() -> None:
         print(result.trade_log.head().to_string(index=False))
 
     # ── Visualizations ─────────────────────────────────────────────────────
-    try:
-        from pmcc_charts import plot_portfolio
-
-        out = plot_portfolio(result, config.capital)
-        print(f"\n  📊 Charts written to: {out}")
-    except ImportError:
-        print("\n  (install plotly to enable charts: uv pip install plotly)")
+    out = plot_portfolio(result, config.capital)
+    print(f"\n  📊 Charts written to: {out}")
 
 
 if __name__ == "__main__":

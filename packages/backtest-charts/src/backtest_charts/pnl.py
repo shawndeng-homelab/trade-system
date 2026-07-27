@@ -42,7 +42,7 @@ def plot_cumulative_pnl(result) -> alt.Chart:
                 alt.Tooltip("cumulative_pnl:Q", title="Cum P&L", format="$,.0f"),
             ],
         )
-        .properties(title="Cumulative P&L by Leg", width="container", height=280)
+        .properties(title="Cumulative P&L by Leg", width=580, height=280)
         .add_params(alt.selection_point(name="cum_pnl_zoom", encodings=["x", "y"], bind="scales"))
     )
 
@@ -91,5 +91,5 @@ def plot_pnl_distribution(result) -> alt.Chart:
             ),
             tooltip=tooltip,
         )
-        .properties(title="Per-Trade P&L Distribution", width="container", height=280)
+        .properties(title="Per-Trade P&L Distribution", width=580, height=280)
     )

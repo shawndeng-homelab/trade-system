@@ -52,7 +52,7 @@ def plot_equity_curve(result, initial_capital: float) -> alt.Chart:
         )
     )
 
-    return (line + ref + ref_text).properties(title="Portfolio Equity Curve", width="container", height=280).add_params(
+    return (line + ref + ref_text).properties(title="Portfolio Equity Curve", width=580, height=280).add_params(
         alt.selection_point(name="equity_zoom", encodings=["x", "y"], bind="scales")
     )
 
@@ -63,5 +63,5 @@ def _empty_chart(title: str, message: str) -> alt.Chart:
         alt.Chart()
         .mark_text(fontSize=14, color="gray")
         .encode(text=alt.value(message))
-        .properties(title=title, width="container", height=280)
+        .properties(title=title, width=580, height=280)
     )

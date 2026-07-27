@@ -122,5 +122,6 @@ deploy-all: build publish-all
 export-deps:
     uv export --no-hashes --output-file requirements.txt
 
-# TODO: re-implement package scaffolding without NautilusTrader dependencies
-# add-package name:
+# Add a new package to the workspace (skeleton + cog.toml + sync)
+add-package name:
+    uvx repo-scaffold@latest add-package {{name}}

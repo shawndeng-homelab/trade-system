@@ -80,6 +80,8 @@ def run_pmcc(
         "entry_dates": short_entry,
         "take_profit": config.short_take_profit,
     }
+    if config.short_stop_loss is not None:
+        short_leg["stop_loss"] = config.short_stop_loss
     if config.short_max_hold_days is not None:
         short_leg["max_hold_days"] = config.short_max_hold_days
 

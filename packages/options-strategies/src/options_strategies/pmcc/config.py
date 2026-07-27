@@ -33,6 +33,7 @@ class PmccConfig(BaseModel):
         short_max_entry_dte: Max DTE for short call entry (near term).
         short_exit_dte: Exit DTE for short call.
         short_take_profit: Take-profit threshold for short call (0.8 = 80% profit).
+        short_stop_loss: Stop-loss threshold for short call (negative, e.g. -2.0 = lose 2× premium).
         short_max_hold_days: Optional max hold days for short call.
         leaps_weight: Capital allocation weight for LEAPS leg.
         short_weight: Capital allocation weight for short call leg.
@@ -67,6 +68,7 @@ class PmccConfig(BaseModel):
     short_max_entry_dte: int = Field(45, gt=0)
     short_exit_dte: int = Field(7, ge=0)
     short_take_profit: float = Field(0.8, gt=0)
+    short_stop_loss: float | None = Field(None, lt=0)
     short_max_hold_days: int | None = None
 
     # ── Portfolio weights ──────────────────────────────────────────────────

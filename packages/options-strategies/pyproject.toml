@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "ShawnDeng-code", email = "shawndeng1109@qq.com" }
 ]
-requires-python = ">=3.12, <3.14"
+requires-python = ">=3.12, <3.15"
 dependencies = [
     "optopsy[data]>=2.3.0",
     "psycopg2>=2.9.12",

@@ -13,7 +13,7 @@ def plot_exit_breakdown(result) -> alt.Chart:
             ``exit_type`` and ``leg`` columns).
 
     Returns:
-        Altair grouped bar chart of exit counts by type and leg.
+        Altair stacked bar chart of exit counts by type, stacked by leg.
     """
     log = result.trade_log
     if log is None or log.empty or "exit_type" not in log.columns or "leg" not in log.columns:
@@ -28,7 +28,6 @@ def plot_exit_breakdown(result) -> alt.Chart:
             x=alt.X("exit_type:N", title="Exit type"),
             y=alt.Y("count:Q", title="Count"),
             color=alt.Color("leg:N", title="Leg"),
-            xOffset="leg:N",
             tooltip=[
                 alt.Tooltip("leg:N", title="Leg"),
                 alt.Tooltip("exit_type:N", title="Exit type"),

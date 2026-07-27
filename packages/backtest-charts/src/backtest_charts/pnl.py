@@ -31,7 +31,7 @@ def plot_cumulative_pnl(result) -> alt.Chart:
 
     return (
         alt.Chart(df)
-        .mark_line(point=True, strokeWidth=2)
+        .mark_line(strokeWidth=2)
         .encode(
             x=alt.X("exit_date:T", title="Exit date"),
             y=alt.Y("cumulative_pnl:Q", title="Cumulative P&L ($)", axis=alt.Axis(format="$,.0f")),

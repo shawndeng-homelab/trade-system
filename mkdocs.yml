@@ -1,7 +1,7 @@
 site_name: trade-system
 repo_url: https://github.com/shawndeng-homelab/trade-system
 site_url: https://shawndeng-homelab.github.io/trade-system
-site_description: my trade tools
+site_description: Options backtesting strategies powered by optopsy
 site_author: shawndeng
 edit_uri: edit/main/docs/
 repo_name: shawndeng-homelab/trade-system
@@ -9,11 +9,9 @@ copyright: Maintained by <a href="https://github.com/shawndeng-homelab">shawnden
 nav:
   - Home: index.md
   - Strategies:
-      - Option management: strategies/option-management.md
-  - NautilusTrader:
-      - NautilusTrader: nautilus/index.md
-      - 策略开发: nautilus/strategy.md
-      - 实盘部署: nautilus/deployment.md
+      - PMCC: strategies/option-management.md
+  - optopsy:
+      - optopsy: optopsy/index.md
   - API Reference: reference/
 plugins:
   - search
@@ -26,9 +24,6 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          # Packages are installed (via `uv run --all-packages`), so mkdocstrings
-          # discovers every workspace package through sys.path — no per-package
-          # `paths` entries to maintain when new packages are added.
           options:
             docstring_style: "google"
             show_source: true
@@ -84,5 +79,3 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/shawndeng-homelab/trade-system
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/trade-system-core

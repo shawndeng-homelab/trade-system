@@ -30,7 +30,7 @@ def plot_equity_curve(result, initial_capital: float) -> alt.Chart:
         .mark_line(color="indigo", strokeWidth=2)
         .encode(
             x=alt.X("date:T", title="Date"),
-            y=alt.Y("equity:Q", title="Equity ($)", axis=alt.Axis(format="$,.0f")),
+            y=alt.Y("equity:Q", title="Equity ($)", axis=alt.Axis(format="$,.0f"), scale=alt.Scale(zero=False)),
             tooltip=[
                 alt.Tooltip("date:T", title="Date"),
                 alt.Tooltip("equity:Q", title="Equity", format="$,.0f"),
@@ -52,7 +52,9 @@ def plot_equity_curve(result, initial_capital: float) -> alt.Chart:
         )
     )
 
-    return (line + ref + ref_text).properties(title="Portfolio Equity Curve", width=600, height=300)
+    return (line + ref + ref_text).properties(title="Portfolio Equity Curve", width="container", height=280).add_params(
+        alt.selection_point(name="equity_zoom", encodings=["x", "y"], bind="scales")
+    )
 
 
 def _empty_chart(title: str, message: str) -> alt.Chart:
@@ -61,5 +63,5 @@ def _empty_chart(title: str, message: str) -> alt.Chart:
         alt.Chart()
         .mark_text(fontSize=14, color="gray")
         .encode(text=alt.value(message))
-        .properties(title=title, width=600, height=300)
+        .properties(title=title, width="container", height=280)
     )

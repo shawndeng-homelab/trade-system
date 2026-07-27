@@ -2,6 +2,23 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.9.0](https://github.com/shawndeng-homelab/trade-system/compare/dd459b5573ae84a075de963be0547c57140f0323..0.9.0) - 2026-07-27
+### Package updates
+- [options-strategies](packages/options-strategies) bumped to [options-strategies-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/98859a9af066acb7867d3eba6e4dba167c5725af..options-strategies-0.1.0)
+### Global changes
+#### Features
+- replace NautilusTrader with optopsy for PMCC backtesting - ([dae1474](https://github.com/shawndeng-homelab/trade-system/commit/dae1474253957914d90640824a37d44c6011473a)) - ShawnDeng-code
+- update - ([ab50582](https://github.com/shawndeng-homelab/trade-system/commit/ab50582bfce99f5a3331eb9e1269ce4689936efd)) - ShawnDeng-code
+- add plotly dashboard and fix simulate_portfolio capital bug - ([efa8bce](https://github.com/shawndeng-homelab/trade-system/commit/efa8bce61e54a2686bd173dc88f8b8476b790d1a)) - ShawnDeng-code
+- update - ([f9bfe1e](https://github.com/shawndeng-homelab/trade-system/commit/f9bfe1e52a362dc340f87a3d42a71371be30cf00)) - ShawnDeng-code
+- update - ([dd459b5](https://github.com/shawndeng-homelab/trade-system/commit/dd459b5573ae84a075de963be0547c57140f0323)) - ShawnDeng-code
+#### Refactoring
+- remove obsolete NautilusTrader packages and fix justfile - ([29a481a](https://github.com/shawndeng-homelab/trade-system/commit/29a481a4e1ef9e822fc076ffba376d07437bf85a)) - ShawnDeng-code
+#### Style
+- fix lint errors in scripts/ and relax PLC0415/D103 for scripts - ([160b1c0](https://github.com/shawndeng-homelab/trade-system/commit/160b1c0960edf96947dcec10eb2f783fd9a357a9)) - ShawnDeng-code
+
+- - -
+
 ## [0.8.0](https://github.com/shawndeng-homelab/trade-system/compare/93716d64265f6012ebafe4c5a5e3bb94b1b78a03..0.8.0) - 2026-07-14
 ### Package updates
 - [trade-system-strategies-0.4.0](packages/trade-system-strategies) bumped to [trade-system-strategies-0.4.0](https://github.com/shawndeng-homelab/trade-system/compare/trade-system-strategies-0.3.0..trade-system-strategies-0.4.0)

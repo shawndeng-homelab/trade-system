@@ -14,3 +14,4 @@
 .env
 .venv/
 .tmp/pmcc_dashboard.html
+.optopsy/

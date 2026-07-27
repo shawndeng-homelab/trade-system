@@ -2,7 +2,7 @@ set dotenv-load := true
 set shell := ["bash", "-euc"]
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
-package_name := "trade_system_core"
+package_name := "options_strategies"
 python_min_version := "3.12"
 python_max_version := "3.14"
 python_dev_version := python_min_version
@@ -122,6 +122,5 @@ deploy-all: build publish-all
 export-deps:
     uv export --no-hashes --output-file requirements.txt
 
-# Add a new package to the workspace (creates package dir + updates cog.toml + syncs)
-add-package name:
-    uv run python scripts/add_package.py {{name}}
+# TODO: re-implement package scaffolding without NautilusTrader dependencies
+# add-package name:

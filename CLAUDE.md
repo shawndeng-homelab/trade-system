@@ -24,10 +24,10 @@ uv run --all-packages --all-groups pytest packages/options-strategies/tests/pmcc
 
 Tests must run with `--all-packages` so workspace packages are importable.
 
-Run the PMCC backtest:
+Run the PMCC backtest (notebook):
 
 ```bash
-uv run --all-packages python scripts/backtest_pmcc.py
+uv run --all-packages jupyter lab scripts/backtest_pmcc.ipynb
 ```
 
 Run the smoke test (synthetic data, no API key needed):
@@ -38,9 +38,10 @@ uv run --all-packages python scripts/smoke_test_pmcc.py
 
 ## Architecture
 
-A monorepo with **one** uv workspace package under `packages/`, powered by [optopsy](https://github.com/michaeljohncarlos/optopsy) (pandas-vectorized options backtester):
+A monorepo with **two** uv workspace packages under `packages/`, powered by [optopsy](https://github.com/michaeljohncarlos/optopsy) (pandas-vectorized options backtester):
 
 - **`options-strategies`** — PMCC and other options strategies. Depends on `optopsy[data]>=2.3.0` (EODHD options + yfinance stock data).
+- **`backtest-charts`** — Altair visualizations for optopsy backtest results. Depends on `altair[all]>=5.5.0` + `pandas>=2.0`. Duck-typed — does not depend on optopsy types.
 
 ### options-strategies layout
 

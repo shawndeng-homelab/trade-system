@@ -30,3 +30,8 @@ docs = [
     "pymdown-extensions>=10.7",
     "mkdocs-literate-nav>=0.6.1",
 ]
+
+notebook = [
+    "jupyterlab>=4.0",
+    "ipywidgets>=8.0",
+]

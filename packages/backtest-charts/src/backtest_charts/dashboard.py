@@ -1,5 +1,6 @@
 """Dashboard: combine individual charts into a multi-panel layout."""
 
+import json
 import os
 
 import altair as alt
@@ -8,6 +9,42 @@ from backtest_charts.equity import plot_equity_curve
 from backtest_charts.exits import plot_exit_breakdown
 from backtest_charts.pnl import plot_cumulative_pnl
 from backtest_charts.pnl import plot_pnl_distribution
+
+
+# HTML template for saved dashboards. The ``#vis`` container is given an
+# explicit width so that ``width='container'`` subcharts (which need a
+# parent with an independently-defined size) render full-width instead of
+# collapsing into a narrow strip.
+_HTML_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@7"></script>
+  <style>
+    body {{
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }}
+    #vis {{
+      width: 100%;
+      max-width: 1600px;
+      margin: 0 auto;
+    }}
+  </style>
+</head>
+<body>
+  <div id="vis"></div>
+  <script type="text/javascript">
+    var spec = {spec};
+    var opt = {{"renderer": "canvas", "actions": true}};
+    vegaEmbed("#vis", spec, opt);
+  </script>
+</body>
+</html>
+"""
 
 
 def plot_dashboard(result, initial_capital: float) -> alt.VConcatChart:
@@ -64,6 +101,8 @@ def plot_portfolio(
     """
     chart = plot_dashboard(result, initial_capital)
     out_abs = os.path.abspath(out_path)
-    # actions=True enables the vega-embed toolbar (export PNG/SVG, view spec)
-    chart.save(out_abs, embed_options={"actions": True})
+    spec = json.loads(chart.to_json())
+    html = _HTML_TEMPLATE.format(spec=json.dumps(spec, indent=None))
+    with open(out_abs, "w", encoding="utf-8") as f:
+        f.write(html)
     return out_abs

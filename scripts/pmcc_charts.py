@@ -4,6 +4,8 @@ Generates an interactive HTML dashboard from a ``PortfolioResult``:
 equity curve, per-leg cumulative P&L, P&L distribution, and exit-type breakdown.
 """
 
+import os
+
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -122,8 +124,6 @@ def plot_portfolio(result, initial_capital: float, out_path: str = "pmcc_dashboa
     fig.update_yaxes(title_text="Cumulative P&L ($)", row=1, col=2)
     fig.update_yaxes(title_text="P&L ($)", row=2, col=1)
     fig.update_yaxes(title_text="Count", row=2, col=2)
-
-    import os
 
     out_abs = os.path.abspath(out_path)
     fig.write_html(out_abs)

@@ -2624,6 +2624,7 @@ docs = [
     { name = "pymdown-extensions" },
 ]
 notebook = [
+    { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jupyterlab" },
 ]
@@ -2646,6 +2647,7 @@ docs = [
     { name = "pymdown-extensions", specifier = ">=10.7" },
 ]
 notebook = [
+    { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "ipywidgets", specifier = ">=8.0" },
     { name = "jupyterlab", specifier = ">=4.0" },
 ]

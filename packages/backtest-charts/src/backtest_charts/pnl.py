@@ -82,7 +82,7 @@ def plot_pnl_distribution(result) -> alt.Chart:
         alt.Chart(df)
         .mark_bar()
         .encode(
-            x=alt.X("trade_id:O", title="Trade #"),
+            x=alt.X("trade_id:O", title="Trade #", axis=alt.Axis(labelOverlap=True)),
             y=alt.Y("realized_pnl:Q", title="P&L ($)", axis=alt.Axis(format="$,.0f")),
             color=alt.Color(
                 "profitable:N",
@@ -91,5 +91,5 @@ def plot_pnl_distribution(result) -> alt.Chart:
             ),
             tooltip=tooltip,
         )
-        .properties(title="Per-Trade P&L Distribution", width=580, height=280)
+        .properties(title="Per-Trade P&L Distribution", width=alt.Step(14), height=280)
     )

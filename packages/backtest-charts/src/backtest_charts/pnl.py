@@ -43,7 +43,7 @@ def plot_cumulative_pnl(result) -> alt.Chart:
             ],
         )
         .properties(title="Cumulative P&L by Leg", width=580, height=280)
-        .add_params(alt.selection_point(name="cum_pnl_zoom", encodings=["x", "y"], bind="scales"))
+        .add_params(alt.selection_interval(name="cum_pnl_zoom", bind="scales"))
     )
 
 
@@ -92,4 +92,5 @@ def plot_pnl_distribution(result) -> alt.Chart:
             tooltip=tooltip,
         )
         .properties(title="Per-Trade P&L Distribution", width=alt.Step(14), height=280)
+        .add_params(alt.selection_interval(name="pnl_dist_zoom", bind="scales"))
     )

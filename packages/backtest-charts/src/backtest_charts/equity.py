@@ -55,7 +55,7 @@ def plot_equity_curve(result, initial_capital: float) -> alt.Chart:
     return (
         (line + ref + ref_text)
         .properties(title="Portfolio Equity Curve", width=580, height=280)
-        .add_params(alt.selection_point(name="equity_zoom", encodings=["x", "y"], bind="scales"))
+        .add_params(alt.selection_interval(name="equity_zoom", bind="scales"))
     )
 
 

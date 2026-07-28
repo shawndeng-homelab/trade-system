@@ -35,4 +35,5 @@ def plot_exit_breakdown(result) -> alt.Chart:
             ],
         )
         .properties(title="Exit Type Breakdown", width=580, height=280)
+        .add_params(alt.selection_interval(name="exit_zoom", bind="scales"))
     )

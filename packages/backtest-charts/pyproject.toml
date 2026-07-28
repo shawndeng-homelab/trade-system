@@ -1,6 +1,6 @@
 [project]
 name = "backtest-charts"
-version = "0.1.1"
+version = "0.1.2"
 description = "Altair visualizations for optopsy backtest results (equity curve, P&L, exit analysis)"
 readme = "README.md"
 authors = [

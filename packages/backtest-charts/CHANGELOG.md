@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [backtest-charts-0.1.2](https://github.com/shawndeng-homelab/trade-system/compare/d42dc6ebaf4856b665c82587ef7c666b775c261c..backtest-charts-0.1.2) - 2026-07-28
+#### Bug Fixes
+- **(charts)** enable pan/zoom interaction with selection_interval - ([d42dc6e](https://github.com/shawndeng-homelab/trade-system/commit/d42dc6ebaf4856b665c82587ef7c666b775c261c)) - ShawnDen-coder
+
+- - -
+
 ## [backtest-charts-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6..backtest-charts-0.1.1) - 2026-07-28
 #### Bug Fixes
 - **(ci)** selective build for changed packages, fix shebang recipe $$ bug - ([191c4b2](https://github.com/shawndeng-homelab/trade-system/commit/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6)) - ShawnDen-coder

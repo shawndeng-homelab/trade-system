@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-This is a **uv workspace**; recipes are defined in the `justfile` and run via `uvx --from rust-just just <recipe>` (or `just <recipe>` if `rust-just` is installed).
+This is a **uv workspace**; recipes are defined in the `justfile` and run via `uvx --from rust-just just <recipe>` (or `just <recipe>` if `rust-just` is installed). The justfile loads `.env` automatically (`set dotenv-load := true`).
 
 ```bash
 just init            # uv sync --all-packages --all-groups + install pre-commit hooks
 just lint            # ruff check --fix, ruff format, ruff check (run before committing)
-just test            # pytest on the dev Python (3.12)
-just test-all        # pytest across the full version range (3.12–3.14)
+just test            # pytest with coverage on the dev Python (3.12)
+just test-all        # pytest with coverage across the full version range (3.12–3.14)
 just test-version 3.13
 just docs            # mkdocs serve (local preview)
 just build           # build sdist + wheel for every workspace package
@@ -19,10 +19,10 @@ just build           # build sdist + wheel for every workspace package
 Run a single test:
 
 ```bash
-uv run --all-packages --all-groups pytest packages/options-strategies/tests/pmcc/test_pmcc_config.py -v
+uv run --all-packages --all-groups pytest packages/options-strategies/tests/test_imports.py -v
 ```
 
-Tests must run with `--all-packages` so workspace packages are importable.
+Tests must run with `--all-packages` so workspace packages are importable. Test recipes include `--cov=options_strategies` coverage flags.
 
 Run the PMCC backtest (notebook):
 
@@ -40,8 +40,8 @@ uv run --all-packages python scripts/smoke_test_pmcc.py
 
 A monorepo with **two** uv workspace packages under `packages/`, powered by [optopsy](https://github.com/michaeljohncarlos/optopsy) (pandas-vectorized options backtester):
 
-- **`options-strategies`** — PMCC and other options strategies. Depends on `optopsy[data]>=2.3.0` (EODHD options + yfinance stock data).
-- **`backtest-charts`** — Altair visualizations for optopsy backtest results. Depends on `altair[all]>=5.5.0` + `pandas>=2.0`. Duck-typed — does not depend on optopsy types.
+- **`options-strategies`** — PMCC and other options strategies. Depends on `optopsy[data]>=2.3.0` (EODHD options + yfinance stock data), `psycopg2`, and `sqlalchemy`.
+- **`backtest-charts`** — Altair visualizations for optopsy backtest results. Depends on `altair[all]>=5.5.0` + `pandas>=2.0`. Duck-typed — does not depend on optopsy types; accepts any object with `trade_log`, `equity_curve`, `summary`, and `leg_results` attributes.
 
 ### options-strategies layout
 
@@ -49,6 +49,17 @@ Each strategy lives in its own subpackage split into three files — **`config.p
 
 - `pmcc/` — Poor Man's Covered Call (long deep-ITM LEAPS + short near-term OTM call). Two independent legs via `simulate_portfolio`; short call uses `take_profit=0.8` for 80%-profit early exit.
 - `shared/` — data loading (`load_pmcc_data`) wrapping optopsy's `load_cached_options`/`load_cached_stocks`.
+
+### backtest-charts layout
+
+Four chart modules + a dashboard composer, each returning composable `alt.Chart` objects:
+
+- `equity.py` — equity curve with starting-capital reference line
+- `pnl.py` — cumulative P&L by leg + per-trade P&L distribution (green/crimson bars)
+- `exits.py` — exit-type count grouped by leg (stacked bar)
+- `dashboard.py` — 2×2 layout (`plot_dashboard`) + HTML save convenience (`plot_portfolio`)
+
+Charts handle empty/missing data gracefully via `_empty_chart()` placeholders. Tests use a pickled real `PortfolioResult` fixture at `tests/fixtures/portfolio_result.pkl` (regenerate instructions in `test_charts.py` docstring).
 
 ### Key patterns
 
@@ -72,6 +83,12 @@ Each strategy lives in its own subpackage split into three files — **`config.p
 - **Absolute imports**: use `from options_strategies.pmcc.config import PmccConfig`, not `from .config import PmccConfig`.
 - **No `from __future__ import annotations`**: removed from all modules.
 
+## CI
+
+GitHub Actions workflow (`.github/workflows/ci-tests.yaml`): lint job (ruff + pre-commit) → test job (matrix: Python 3.12/3.13/3.14). Pre-commit hooks: `uv-lock`, `yamlfmt`, `check-github-workflows`, `actionlint`.
+
 ## Release
 
-Versioning is managed by **cocogitto** (`cog.toml`) from [conventional commits](https://www.conventionalcommits.org/). It's a monorepo setup: each `[packages.*]` entry maps commit paths to per-package versions and tags. Only commits touching a registered package path trigger that package's bump. Currently registered: `options-strategies`. CHANGELOG is generated automatically — don't edit it by hand.
+Versioning is managed by **cocogitto** (`cog.toml`) from [conventional commits](https://www.conventionalcommits.org/). It's a monorepo setup: each `[packages.*]` entry maps commit paths to per-package versions and tags. Only commits touching a registered package path trigger that package's bump. Currently registered: `options-strategies`, `backtest-charts`. CHANGELOG is generated automatically — don't edit it by hand.
+
+Publish targets: public PyPI (`just deploy-pypi`) and a private PyPI server (`just deploy-pypi-server`, URL from `PYPI_SERVER_URL` env var, defaults to `pypiserver.shawndeng.cc`).

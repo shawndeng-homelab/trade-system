@@ -64,47 +64,38 @@ deploy-gh-pages:
 build:
     uv build --all-packages
 
-# Publish to public PyPI (only packages with new version tags)
-publish-pypi:
+# Build only packages that have a new version tag (for CI)
+build-changed:
     #!/usr/bin/env bash
     set -euo pipefail
-    changed_files=""
-    for f in dist/*; do
-        basename=$$(basename "$$f")
-        pkg=$${basename%%-*}
-        ver=$${basename#*-}
-        ver=$${ver%%-*}
-        tag_name="$${pkg//_/-}-$$ver"
-        if git tag -l "$$tag_name" | grep -q .; then
-            changed_files="$$changed_files $$f"
+    # Get the commit this workflow is running on
+    commit=$(git rev-parse HEAD)
+    built=0
+    for pkg_dir in packages/*/; do
+        pkg=$(basename "$pkg_dir")
+        # Read version from pyproject.toml
+        ver=$(grep '^version' "$pkg_dir/pyproject.toml" | head -1 | sed 's/version.*=.*"\(.*\)"/\1/')
+        tag="${pkg}-${ver}"
+        # Only build if the tag exists AND points to the current commit
+        if tag_commit=$(git rev-parse "refs/tags/${tag}^{commit}" 2>/dev/null) && [ "$tag_commit" = "$commit" ]; then
+            echo "✅ ${pkg} ${ver} has new tag at this commit, building..."
+            uv build --package "$pkg"
+            built=$((built + 1))
+        else
+            echo "⏭️  ${pkg} ${ver} tag not at this commit, skipping"
         fi
     done
-    if [ -z "$$changed_files" ]; then
-        echo "No changed packages to publish"
-    else
-        uv publish --check-url https://pypi.org/simple/ $$changed_files
+    if [ "$built" -eq 0 ]; then
+        echo "No changed packages to build"
     fi
 
-# Publish to the private PyPI server (only packages with new version tags)
+# Publish to public PyPI (skips versions already on PyPI)
+publish-pypi:
+    uv publish --check-url https://pypi.org/simple/ dist/*
+
+# Publish to the private PyPI server (skips versions already on the server)
 publish-pypi-server:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    changed_files=""
-    for f in dist/*; do
-        basename=$$(basename "$$f")
-        pkg=$${basename%%-*}
-        ver=$${basename#*-}
-        ver=$${ver%%-*}
-        tag_name="$${pkg//_/-}-$$ver"
-        if git tag -l "$$tag_name" | grep -q .; then
-            changed_files="$$changed_files $$f"
-        fi
-    done
-    if [ -z "$$changed_files" ]; then
-        echo "No changed packages to publish"
-    else
-        uv publish --username {{env_var('PYPI_SERVER_USERNAME')}} --password {{env_var('PYPI_SERVER_PASSWORD')}} --publish-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}} $$changed_files
-    fi
+    uv publish --check-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}}/simple/ --username {{env_var('PYPI_SERVER_USERNAME')}} --password {{env_var('PYPI_SERVER_PASSWORD')}} --publish-url {{env_var_or_default('PYPI_SERVER_URL', pypi_server_url)}} dist/*
 
 # Publish to both indexes
 publish-all: publish-pypi publish-pypi-server

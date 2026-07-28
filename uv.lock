@@ -259,7 +259,7 @@ wheels = [
 
 [[package]]
 name = "backtest-charts"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/backtest-charts" }
 dependencies = [
     { name = "altair", extra = ["all"] },

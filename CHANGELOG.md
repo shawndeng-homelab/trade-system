@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.10.1](https://github.com/shawndeng-homelab/trade-system/compare/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6..0.10.1) - 2026-07-28
+### Package updates
+- [backtest-charts-0.1.1](packages/backtest-charts) bumped to [backtest-charts-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/backtest-charts-0.1.0..backtest-charts-0.1.1)
+### Global changes
+#### Bug Fixes
+- **(ci)** selective build for changed packages, fix shebang recipe $$ bug - ([191c4b2](https://github.com/shawndeng-homelab/trade-system/commit/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6)) - ShawnDen-coder
+
+- - -
+
 ## [0.10.0](https://github.com/shawndeng-homelab/trade-system/compare/f691951683dcf956fe6f443e3bbfcd9e46917340..0.10.0) - 2026-07-27
 ### Package updates
 - [options-strategies-0.2.0](packages/options-strategies) bumped to [options-strategies-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/options-strategies-0.1.0..options-strategies-0.2.0)

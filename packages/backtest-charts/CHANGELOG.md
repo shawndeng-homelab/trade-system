@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [backtest-charts-0.1.1](https://github.com/shawndeng-homelab/trade-system/compare/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6..backtest-charts-0.1.1) - 2026-07-28
+#### Bug Fixes
+- **(ci)** selective build for changed packages, fix shebang recipe $$ bug - ([191c4b2](https://github.com/shawndeng-homelab/trade-system/commit/191c4b2d61aaddf7fcd2b7acf9bca67b82f272d6)) - ShawnDen-coder
+
+- - -
+
 ## [backtest-charts-0.1.0](https://github.com/shawndeng-homelab/trade-system/compare/edb5a1ba2227904849c4006cea9205af01d14efc..backtest-charts-0.1.0) - 2026-07-27
 #### Bug Fixes
 - remove point=True and xOffset for VS Code notebook compat - ([5c4b9b0](https://github.com/shawndeng-homelab/trade-system/commit/5c4b9b098b3708a0807bba78627fb666ae94856c)) - ShawnDeng-code

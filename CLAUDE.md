@@ -41,7 +41,7 @@ uv run --all-packages python scripts/smoke_test_pmcc.py
 A monorepo with **two** uv workspace packages under `packages/`, powered by [optopsy](https://github.com/michaeljohncarlos/optopsy) (pandas-vectorized options backtester):
 
 - **`options-strategies`** — PMCC and other options strategies. Depends on `optopsy[data]>=2.3.0` (EODHD options + yfinance stock data), `psycopg2`, and `sqlalchemy`.
-- **`backtest-charts`** — Altair visualizations for optopsy backtest results. Depends on `altair[all]>=5.5.0` + `pandas>=2.0`. Duck-typed — does not depend on optopsy types; accepts any object with `trade_log`, `equity_curve`, `summary`, and `leg_results` attributes.
+- **`backtest-charts`** — Plotly visualizations for optopsy backtest results. Depends on `plotly>=5.0` + `pandas>=2.0`. Duck-typed — does not depend on optopsy types; accepts any object with `trade_log`, `equity_curve`, `summary`, and `leg_results` attributes.
 
 ### options-strategies layout
 
@@ -52,14 +52,17 @@ Each strategy lives in its own subpackage split into three files — **`config.p
 
 ### backtest-charts layout
 
-Four chart modules + a dashboard composer, each returning composable `alt.Chart` objects:
+**BacktestReport** OOP API wraps a duck-typed result object, pre-extracts validated data into `BacktestData` (frozen dataclass), and provides chart methods + per-instance panel registry. Chart functions accept `BacktestData` instead of raw result objects, decoupling visualization from optopsy internals.
 
-- `equity.py` — equity curve with starting-capital reference line
-- `pnl.py` — cumulative P&L by leg + per-trade P&L distribution (green/crimson bars)
-- `exits.py` — exit-type count grouped by leg (stacked bar)
-- `dashboard.py` — 2×2 layout (`plot_dashboard`) + HTML save convenience (`plot_portfolio`)
+- `data.py` — `BacktestData` + `LegData` frozen dataclasses; `from_result()` validates and normalizes data; `has_trades`/`has_equity` properties
+- `report.py` — `BacktestReport` class; `DEFAULT_PANELS` class-level registry; `plot_equity()`, `plot_cum_pnl()`, `plot_pnl_dist()`, `plot_exits()`, `plot_summary()`, `plot_dashboard()`, `save_html()`; `@report.panel()` decorator for custom panels
+- `equity.py` — equity curve with starting-capital reference line (`plot_equity(data)`)
+- `pnl.py` — cumulative P&L by leg + per-trade P&L distribution (`plot_cum_pnl(data)`, `plot_pnl_dist(data)`)
+- `exits.py` — exit-type count grouped by leg (`plot_exits(data)`)
+- `summary.py` — strategy metrics table via `go.Table` (`plot_summary(data)`)
+- `_util.py` — `_empty_chart()` placeholder for missing data
 
-Charts handle empty/missing data gracefully via `_empty_chart()` placeholders. Tests use a pickled real `PortfolioResult` fixture at `tests/fixtures/portfolio_result.pkl` (regenerate instructions in `test_charts.py` docstring).
+Dashboard composition uses `make_subplots` with auto-detected `specs` (domain type for `go.Table` traces). Panel registry is per-instance (copied from `DEFAULT_PANELS`), eliminating global mutable state. Legacy function API (`plot_equity_curve`, etc.) preserved as `DeprecationWarning` wrappers. Tests use a pickled real `PortfolioResult` fixture at `tests/fixtures/portfolio_result.pkl` (regenerate instructions in `test_charts.py` docstring).
 
 ### Key patterns
 

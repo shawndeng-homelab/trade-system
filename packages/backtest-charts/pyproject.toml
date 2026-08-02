@@ -1,14 +1,14 @@
 [project]
 name = "backtest-charts"
-version = "0.1.2"
-description = "Altair visualizations for optopsy backtest results (equity curve, P&L, exit analysis)"
+version = "0.2.0"
+description = "Plotly visualizations for optopsy backtest results (equity curve, P&L, exit analysis, summary)"
 readme = "README.md"
 authors = [
     { name = "ShawnDeng-code", email = "shawndeng1109@qq.com" }
 ]
 requires-python = ">=3.12, <3.15"
 dependencies = [
-    "altair[all]>=5.5.0",
+    "plotly>=5.0",
     "pandas>=2.0",
 ]
 

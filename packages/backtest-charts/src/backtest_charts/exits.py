@@ -1,39 +1,54 @@
 """Exit-type analysis visualization."""
 
-import altair as alt
+import plotly.graph_objects as go
 
-from backtest_charts.equity import _empty_chart
+from backtest_charts._util import _empty_chart
+from backtest_charts.data import BacktestData
 
 
-def plot_exit_breakdown(result) -> alt.Chart:
+def plot_exits(data: BacktestData) -> go.Figure:
     """Plot exit-type count grouped by leg.
 
     Args:
-        result: Object with ``trade_log`` attribute (``pd.DataFrame`` with
-            ``exit_type`` and ``leg`` columns).
+        data: Pre-extracted backtest data.
 
     Returns:
-        Altair stacked bar chart of exit counts by type, stacked by leg.
+        Plotly stacked bar chart of exit counts by type, stacked by leg.
     """
-    log = result.trade_log
-    if log is None or log.empty or "exit_type" not in log.columns or "leg" not in log.columns:
+    log = data.trade_log
+    if not data.has_trades or "exit_type" not in log.columns or "leg" not in log.columns:
         return _empty_chart("Exit Type Breakdown", "No exit type data")
 
     counts = log.groupby(["leg", "exit_type"]).size().reset_index(name="count")
 
-    return (
-        alt.Chart(counts)
-        .mark_bar()
-        .encode(
-            x=alt.X("exit_type:N", title="Exit type"),
-            y=alt.Y("count:Q", title="Count"),
-            color=alt.Color("leg:N", title="Leg"),
-            tooltip=[
-                alt.Tooltip("leg:N", title="Leg"),
-                alt.Tooltip("exit_type:N", title="Exit type"),
-                alt.Tooltip("count:Q", title="Count"),
-            ],
+    fig = go.Figure()
+    for leg_name in counts["leg"].unique():
+        leg_data = counts[counts["leg"] == leg_name]
+        fig.add_trace(
+            go.Bar(
+                x=leg_data["exit_type"],
+                y=leg_data["count"],
+                name=str(leg_name),
+                hovertemplate="Leg: %{data.name}<br>Exit type: %{x}<br>Count: %{y}<extra></extra>",
+            )
         )
-        .properties(title="Exit Type Breakdown", width=580, height=280)
-        .add_params(alt.selection_interval(name="exit_zoom", bind="scales"))
+
+    fig.update_layout(
+        title={"text": "Exit Type Breakdown", "x": 0.5},
+        xaxis_title="Exit type",
+        yaxis_title="Count",
+        barmode="stack",
+        width=580,
+        height=280,
     )
+    return fig
+
+
+# Backward-compatible wrapper
+def plot_exit_breakdown(result) -> go.Figure:
+    """Plot exit-type breakdown (legacy API).
+
+    .. deprecated:: 0.2.0
+        Use :meth:`BacktestReport.plot_exits` instead.
+    """
+    return plot_exits(BacktestData.from_result(result, capital=100_000.0))

@@ -113,6 +113,17 @@ deploy-all: build publish-all
 export-deps:
     uv export --no-hashes --output-file requirements.txt
 
+# Download options data for a symbol (default: SPY)
+download-options symbol="SPY":
+    uv run optopsy-data download {{symbol}} -o -v
+
+# Download stock data for a symbol (default: SPY)
+download-stocks symbol="SPY":
+    uv run optopsy-data download {{symbol}} -s -v
+
+# Download both options and stock data for a symbol (default: SPY)
+download symbol="SPY": (download-options symbol) (download-stocks symbol)
+
 # Add a new package to the workspace (skeleton + cog.toml + sync)
 add-package name:
     uvx repo-scaffold@latest add-package {{name}}

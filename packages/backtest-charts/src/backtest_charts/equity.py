@@ -1,69 +1,71 @@
 """Portfolio equity curve visualization."""
 
-import altair as alt
 import pandas as pd
+import plotly.graph_objects as go
+
+from backtest_charts._util import _empty_chart
+from backtest_charts.data import BacktestData
 
 
-def plot_equity_curve(result, initial_capital: float) -> alt.Chart:
+def plot_equity(data: BacktestData) -> go.Figure:
     """Plot portfolio equity curve with a starting-capital reference line.
 
     Args:
-        result: Object with ``equity_curve`` attribute (``pd.Series``, date-indexed).
-        initial_capital: Starting capital for the reference line.
+        data: Pre-extracted backtest data.
 
     Returns:
-        Altair line chart of portfolio equity over time.
+        Plotly line chart of portfolio equity over time.
     """
-    ec = result.equity_curve
-    if ec is None or (isinstance(ec, pd.Series) and ec.empty):
+    if not data.has_equity:
         return _empty_chart("Portfolio Equity Curve", "No equity curve data")
 
     df = pd.DataFrame(
         {
-            "date": pd.to_datetime(ec.index),
-            "equity": ec.values,
+            "date": data.equity_curve.index,
+            "equity": data.equity_curve.values,
         }
     )
 
-    line = (
-        alt.Chart(df)
-        .mark_line(color="indigo", strokeWidth=2)
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("equity:Q", title="Equity ($)", axis=alt.Axis(format="$,.0f"), scale=alt.Scale(zero=False)),
-            tooltip=[
-                alt.Tooltip("date:T", title="Date"),
-                alt.Tooltip("equity:Q", title="Equity", format="$,.0f"),
-            ],
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df["date"],
+            y=df["equity"],
+            mode="lines",
+            line={"color": "indigo", "width": 2},
+            name="Equity",
+            hovertemplate="Date: %{x|%Y-%m-%d}<br>Equity: $%{y:,.0f}<extra></extra>",
         )
     )
 
     # Reference line at initial capital
-    ref_df = pd.DataFrame({"initial_capital": [initial_capital]})
-    ref = alt.Chart(ref_df).mark_rule(strokeDash=[6, 4], color="gray").encode(y=alt.Y("initial_capital:Q"))
-
-    # Text label for the reference line
-    ref_text = (
-        alt.Chart(ref_df)
-        .mark_text(align="left", dx=4, dy=-4, color="gray", fontSize=10)
-        .encode(
-            y=alt.Y("initial_capital:Q"),
-            text=alt.value(f"Start ${initial_capital:,.0f}"),
-        )
+    fig.add_hline(
+        y=data.capital,
+        line_dash="dash",
+        line_color="gray",
+        annotation_text=f"Start ${data.capital:,.0f}",
+        annotation_position="top left",
+        annotation_font_size=10,
+        annotation_font_color="gray",
     )
 
-    return (
-        (line + ref + ref_text)
-        .properties(title="Portfolio Equity Curve", width=580, height=280)
-        .add_params(alt.selection_interval(name="equity_zoom", bind="scales"))
+    fig.update_layout(
+        title={"text": "Portfolio Equity Curve", "x": 0.5},
+        xaxis_title="Date",
+        yaxis_title="Equity ($)",
+        yaxis_tickformat="$,.0f",
+        yaxis_zeroline=False,
+        width=580,
+        height=280,
     )
+    return fig
 
 
-def _empty_chart(title: str, message: str) -> alt.Chart:
-    """Return a chart that displays a placeholder message when data is missing."""
-    return (
-        alt.Chart()
-        .mark_text(fontSize=14, color="gray")
-        .encode(text=alt.value(message))
-        .properties(title=title, width=580, height=280)
-    )
+# Backward-compatible wrapper
+def plot_equity_curve(result, initial_capital: float) -> go.Figure:
+    """Plot portfolio equity curve (legacy API).
+
+    .. deprecated:: 0.2.0
+        Use :meth:`BacktestReport.plot_equity` instead.
+    """
+    return plot_equity(BacktestData.from_result(result, initial_capital))

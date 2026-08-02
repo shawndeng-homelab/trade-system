@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [options-strategies-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/28b5f8b0e09d61baba40b376f9a6fd96565ae059..options-strategies-0.3.0) - 2026-08-02
+#### Features
+- update viz - ([aa68c45](https://github.com/shawndeng-homelab/trade-system/commit/aa68c4513092c2e3f546059f85f207d661152219)) - ShawnDeng-code
+- update viz - ([4db1bb2](https://github.com/shawndeng-homelab/trade-system/commit/4db1bb23ef596eef89e15fb864ccc398a0230a2b)) - ShawnDeng-code
+- update viz - ([28b5f8b](https://github.com/shawndeng-homelab/trade-system/commit/28b5f8b0e09d61baba40b376f9a6fd96565ae059)) - ShawnDeng-code
+
+- - -
+
 ## [options-strategies-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/edb5a1ba2227904849c4006cea9205af01d14efc..options-strategies-0.2.0) - 2026-07-27
 #### Features
 - add backtest-charts package with Altair visualizations - ([edb5a1b](https://github.com/shawndeng-homelab/trade-system/commit/edb5a1ba2227904849c4006cea9205af01d14efc)) - ShawnDeng-code

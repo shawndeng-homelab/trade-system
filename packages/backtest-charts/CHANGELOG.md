@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [backtest-charts-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/a132da1d269478e1c0aebcca75090bf1f2164d31..backtest-charts-0.2.0) - 2026-08-02
+#### Features
+- update viz - ([aa68c45](https://github.com/shawndeng-homelab/trade-system/commit/aa68c4513092c2e3f546059f85f207d661152219)) - ShawnDeng-code
+- update viz - ([28b5f8b](https://github.com/shawndeng-homelab/trade-system/commit/28b5f8b0e09d61baba40b376f9a6fd96565ae059)) - ShawnDeng-code
+- update viz - ([a132da1](https://github.com/shawndeng-homelab/trade-system/commit/a132da1d269478e1c0aebcca75090bf1f2164d31)) - ShawnDeng-code
+#### Refactoring
+- **(charts)** eliminate hardcoded values, simplify data extraction, fix altitude issues - ([b68adbc](https://github.com/shawndeng-homelab/trade-system/commit/b68adbc87ecd7091b4ea48272be2cfbc2bfa3ff8)) - ShawnDeng-code
+
+- - -
+
 ## [backtest-charts-0.1.2](https://github.com/shawndeng-homelab/trade-system/compare/d42dc6ebaf4856b665c82587ef7c666b775c261c..backtest-charts-0.1.2) - 2026-07-28
 #### Bug Fixes
 - **(charts)** enable pan/zoom interaction with selection_interval - ([d42dc6e](https://github.com/shawndeng-homelab/trade-system/commit/d42dc6ebaf4856b665c82587ef7c666b775c261c)) - ShawnDen-coder

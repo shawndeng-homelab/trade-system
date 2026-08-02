@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.11.0](https://github.com/shawndeng-homelab/trade-system/compare/aa68c4513092c2e3f546059f85f207d661152219..0.11.0) - 2026-08-02
+### Package updates
+- [backtest-charts-0.2.0](packages/backtest-charts) bumped to [backtest-charts-0.2.0](https://github.com/shawndeng-homelab/trade-system/compare/backtest-charts-0.1.2..backtest-charts-0.2.0)
+- [options-strategies-0.3.0](packages/options-strategies) bumped to [options-strategies-0.3.0](https://github.com/shawndeng-homelab/trade-system/compare/options-strategies-0.2.0..options-strategies-0.3.0)
+### Global changes
+#### Features
+- update viz - ([a132da1](https://github.com/shawndeng-homelab/trade-system/commit/a132da1d269478e1c0aebcca75090bf1f2164d31)) - ShawnDeng-code
+- update viz - ([28b5f8b](https://github.com/shawndeng-homelab/trade-system/commit/28b5f8b0e09d61baba40b376f9a6fd96565ae059)) - ShawnDeng-code
+- update viz - ([4db1bb2](https://github.com/shawndeng-homelab/trade-system/commit/4db1bb23ef596eef89e15fb864ccc398a0230a2b)) - ShawnDeng-code
+- update viz - ([aa68c45](https://github.com/shawndeng-homelab/trade-system/commit/aa68c4513092c2e3f546059f85f207d661152219)) - ShawnDeng-code
+
+- - -
+
 ## [0.10.2](https://github.com/shawndeng-homelab/trade-system/compare/0.10.1..0.10.2) - 1970-01-01
 ### Package updates
 - [backtest-charts-0.1.2](packages/backtest-charts) bumped to [backtest-charts-0.1.2](https://github.com/shawndeng-homelab/trade-system/compare/backtest-charts-0.1.1..backtest-charts-0.1.2)

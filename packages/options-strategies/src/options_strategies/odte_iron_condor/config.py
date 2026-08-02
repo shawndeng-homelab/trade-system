@@ -1,12 +1,20 @@
-"""0DTE Iron Condor strategy configuration.
+"""Iron Condor strategy configuration.
 
-Defines all parameters for running a 0DTE iron condor backtest via optopsy.
+Defines all parameters for running an iron condor backtest via optopsy.
 An iron condor consists of four legs: long put (wing), short put (income),
 short call (income), long call (wing).  This is a neutral income strategy
 that profits when the underlying stays between the two short strikes.
 
-0DTE (zero days to expiration) iron condors are entered on the same day
-as expiration, capturing rapid time decay in the final session.
+Supports multiple entry cycles via ``entry_cycle``:
+
+- ``"daily"`` — enter every trading day (0DTE / near-expiry style)
+- ``"weekly"`` — enter once per week (standard weekly iron condor)
+- ``"biweekly"`` — enter once every two weeks (two-week iron condor)
+- ``"monthly"`` — enter once per month
+
+With EODHD daily-frequency data, many expiration-day (DTE=0) rows are
+missing, so ``exit_dte_tolerance`` is recommended to allow flexible exit
+matching.
 """
 
 from pydantic import BaseModel
@@ -15,7 +23,7 @@ from pydantic import Field
 
 
 class OdteIronCondorConfig(BaseModel):
-    """0DTE iron condor strategy parameters backed by optopsy.
+    """Iron condor strategy parameters backed by optopsy.
 
     Attributes:
         symbol: Primary underlying ticker (e.g. "SPY").
@@ -26,6 +34,9 @@ class OdteIronCondorConfig(BaseModel):
         start_date: Optional start date filter (YYYY-MM-DD).
         end_date: Optional end date filter (YYYY-MM-DD).
         symbols: List of underlying tickers to trade (e.g. ["SPY", "QQQ", "IWM"]).
+        entry_cycle: How often to open new positions.  One of "daily",
+            "weekly", "biweekly", "monthly".  Controls the entry-date
+            signal frequency (see ``signals.py``).
         long_put_delta: Target delta for long put wing (default 0.10).
         long_put_delta_min: Min delta for long put selection.
         long_put_delta_max: Max delta for long put selection.
@@ -38,8 +49,12 @@ class OdteIronCondorConfig(BaseModel):
         long_call_delta: Target delta for long call wing (default 0.10).
         long_call_delta_min: Min delta for long call selection.
         long_call_delta_max: Max delta for long call selection.
-        max_entry_dte: Max DTE for entry (1 = 0DTE or 1DTE).
-        exit_dte: Exit DTE (0 = expire same day).
+        max_entry_dte: Max DTE for entry (default 3 for near-expiry,
+            use 14 for biweekly, 30 for monthly).
+        exit_dte: Exit DTE (0 = expire same day, 7 = exit one week before expiry).
+        exit_dte_tolerance: Tolerance for exit DTE matching (default 1).
+            With EODHD data many DTE=0 rows are missing; tolerance=1 allows
+            exit at DTE 0 or 1 so more trades complete successfully.
         take_profit: Take-profit threshold (0.5 = 50% of credit received).
         stop_loss: Stop-loss threshold (negative, e.g. -2.0 = lose 2x credit).
         entry_time: Target entry time HH:MM (e.g. "15:30" for 30 min before close).
@@ -60,6 +75,9 @@ class OdteIronCondorConfig(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     symbols: list[str] = Field(["SPY"], min_length=1)
+
+    # ── Entry cycle ────────────────────────────────────────────────────────
+    entry_cycle: str = Field("daily", pattern="^(daily|weekly|biweekly|monthly)$")
 
     # ── Long put wing (leg 1) ──────────────────────────────────────────────
     long_put_delta: float = Field(0.10, gt=0, le=1)
@@ -82,8 +100,9 @@ class OdteIronCondorConfig(BaseModel):
     long_call_delta_max: float = Field(0.15, gt=0, le=1)
 
     # ── DTE ────────────────────────────────────────────────────────────────
-    max_entry_dte: int = Field(1, gt=0)
+    max_entry_dte: int = Field(3, gt=0)
     exit_dte: int = Field(0, ge=0)
+    exit_dte_tolerance: int = Field(1, ge=0)
 
     # ── Risk management ────────────────────────────────────────────────────
     take_profit: float = Field(0.5, gt=0)

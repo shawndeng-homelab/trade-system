@@ -1,8 +1,9 @@
 """0DTE Iron Condor backtest strategy powered by optopsy.
 
 An iron condor is a 4-leg neutral strategy: long put (wing) + short put
-(income) + short call (income) + long call (wing).  The 0DTE variant
-enters on the day of expiration, capturing rapid time decay.
+(income) + short call (income) + long call (wing).  The near-expiry variant
+enters 1–3 days before expiration and exits at or near expiration (DTE 0),
+capturing rapid time decay in the final sessions.
 
 Uses ``optopsy.iron_condor`` as the strategy function with per-leg delta
 targeting via ``leg1_delta`` through ``leg4_delta``.  Multiple underlyings
@@ -47,7 +48,7 @@ def run_odte_iron_condor(
         opt_data = options_df[sym]
         stk_data = stock_df[sym]
 
-        entry = odte_entry_dates(stk_data, entry_time=config.entry_time)
+        entry = odte_entry_dates(stk_data, entry_cycle=config.entry_cycle, entry_time=config.entry_time)
 
         # ── Per-leg delta targeting ─────────────────────────────────────
         leg1_delta = TargetRange(
@@ -87,6 +88,7 @@ def run_odte_iron_condor(
             # DTE constraints
             "max_entry_dte": config.max_entry_dte,
             "exit_dte": config.exit_dte,
+            "exit_dte_tolerance": config.exit_dte_tolerance,
             # Entry signal
             "entry_dates": entry,
             # Risk management

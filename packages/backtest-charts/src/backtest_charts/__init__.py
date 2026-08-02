@@ -25,6 +25,7 @@ import warnings
 
 import plotly.graph_objects as go
 
+from backtest_charts._util import DEFAULT_CAPITAL
 from backtest_charts.data import BacktestData
 from backtest_charts.report import BacktestReport
 
@@ -98,7 +99,7 @@ def plot_dashboard(result, initial_capital: float, *, columns: int = 2) -> go.Fi
     return BacktestReport(result, capital=initial_capital).plot_dashboard(columns=columns)
 
 
-def plot_portfolio(result, initial_capital: float, out_path: str = "pmcc_dashboard.html") -> str:
+def plot_portfolio(result, initial_capital: float, out_path: str = "backtest_dashboard.html") -> str:
     """Save dashboard HTML (legacy). Use ``BacktestReport.save_html()`` instead."""
     warnings.warn(
         "plot_portfolio() is deprecated; use BacktestReport.save_html()",
@@ -159,7 +160,7 @@ class _CompatPanelRegistry:
         """Build all registered panels (old-style)."""
         from backtest_charts.report import DEFAULT_PANELS  # noqa: PLC0415
 
-        data = BacktestData.from_result(result, kwargs.get("initial_capital", 100_000.0))
+        data = BacktestData.from_result(result, kwargs.get("initial_capital", DEFAULT_CAPITAL))
         return [factory(data) for factory in DEFAULT_PANELS.values()]
 
 

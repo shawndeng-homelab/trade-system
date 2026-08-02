@@ -3,8 +3,12 @@
 import pandas as pd
 import plotly.graph_objects as go
 
+from backtest_charts._util import _apply_chart_layout
 from backtest_charts._util import _empty_chart
 from backtest_charts.data import BacktestData
+
+
+_TITLE = "Portfolio Equity Curve"
 
 
 def plot_equity(data: BacktestData) -> go.Figure:
@@ -17,7 +21,7 @@ def plot_equity(data: BacktestData) -> go.Figure:
         Plotly line chart of portfolio equity over time.
     """
     if not data.has_equity:
-        return _empty_chart("Portfolio Equity Curve", "No equity curve data")
+        return _empty_chart(_TITLE, "No equity curve data")
 
     df = pd.DataFrame(
         {
@@ -49,14 +53,12 @@ def plot_equity(data: BacktestData) -> go.Figure:
         annotation_font_color="gray",
     )
 
+    _apply_chart_layout(fig, _TITLE)
     fig.update_layout(
-        title={"text": "Portfolio Equity Curve", "x": 0.5},
         xaxis_title="Date",
         yaxis_title="Equity ($)",
         yaxis_tickformat="$,.0f",
         yaxis_zeroline=False,
-        width=580,
-        height=280,
     )
     return fig
 

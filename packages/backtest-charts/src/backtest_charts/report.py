@@ -12,6 +12,8 @@ from collections import OrderedDict
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from backtest_charts._util import DEFAULT_CAPITAL
+from backtest_charts._util import PANEL_HEIGHT
 from backtest_charts.data import BacktestData
 from backtest_charts.equity import plot_equity
 from backtest_charts.exits import plot_exits
@@ -33,6 +35,11 @@ DEFAULT_PANELS: OrderedDict[str, PanelFactory] = OrderedDict(
         ("summary", plot_summary),
     ]
 )
+
+
+def _is_domain_figure(fig: go.Figure) -> bool:
+    """Return True if the figure contains traces requiring a domain subplot (e.g. Table)."""
+    return any(isinstance(tr, go.Table) for tr in fig.data)
 
 
 def _propagate_layout(dash: go.Figure, panel_fig: go.Figure, row: int, col: int) -> None:
@@ -58,6 +65,8 @@ def _propagate_layout(dash: go.Figure, panel_fig: go.Figure, row: int, col: int)
     # X-axis formatting
     if xa.title and xa.title.text:
         dash.update_xaxes(title_text=xa.title.text, row=row, col=col)
+    if xa.tickformat:
+        dash.update_xaxes(tickformat=xa.tickformat, row=row, col=col)
 
     # Shapes (e.g. hlines from equity curve)
     for shape in panel_fig.layout.shapes or []:
@@ -93,15 +102,17 @@ class BacktestReport:
             return fig
     """
 
-    def __init__(self, result, capital: float = 100_000.0) -> None:
+    def __init__(self, result, capital: float = DEFAULT_CAPITAL, *, title: str = "Backtest Dashboard") -> None:
         """Create a BacktestReport from a backtest result.
 
         Args:
             result: Backtest result object (duck-typed).
             capital: Initial capital for reference lines.
+            title: Dashboard title (shown in the dashboard header).
         """
         self._data = BacktestData.from_result(result, capital)
         self._panels: OrderedDict[str, PanelFactory] = OrderedDict(DEFAULT_PANELS)
+        self._title = title
 
     @property
     def data(self) -> BacktestData:
@@ -160,32 +171,30 @@ class BacktestReport:
         Returns:
             Plotly figure with subplots.
         """
-        panels = [(key, factory(self._data)) for key, factory in self._panels.items()]
-        n = len(panels)
+        # Build panels and detect subplot types in a single pass
+        panel_data: list[tuple[str, go.Figure, bool]] = []
+        for key, factory in self._panels.items():
+            fig = factory(self._data)
+            panel_data.append((key, fig, _is_domain_figure(fig)))
+
+        n = len(panel_data)
         rows = (n + columns - 1) // columns
 
-        # Build specs grid: detect table traces that need {"type": "domain"}
+        # Build specs grid and subplot titles in one pass
         specs: list[list[dict[str, str] | None]] = []
+        subplot_titles: list[str] = []
         for r in range(rows):
             row_specs: list[dict[str, str] | None] = []
             for c in range(columns):
                 idx = r * columns + c
                 if idx < n:
-                    _key, fig = panels[idx]
-                    # Check if any trace is a Table (needs domain subplot)
-                    if any(isinstance(tr, go.Table) for tr in fig.data):
-                        row_specs.append({"type": "domain"})
-                    else:
-                        row_specs.append({})
+                    _key, fig, is_domain = panel_data[idx]
+                    row_specs.append({"type": "domain"} if is_domain else {})
+                    title_text = fig.layout.title.text if fig.layout.title else ""
+                    subplot_titles.append(title_text or "")
                 else:
                     row_specs.append(None)
             specs.append(row_specs)
-
-        # Extract subplot titles from each panel figure
-        subplot_titles = []
-        for _key, fig in panels:
-            title_text = fig.layout.title.text if fig.layout.title else ""
-            subplot_titles.append(title_text or "")
 
         dash = make_subplots(
             rows=rows,
@@ -194,18 +203,17 @@ class BacktestReport:
             subplot_titles=subplot_titles,
         )
 
-        for i, (_key, panel_fig) in enumerate(panels):
+        for i, (_key, panel_fig, is_domain) in enumerate(panel_data):
             row = (i // columns) + 1
             col = (i % columns) + 1
             for trace in panel_fig.data:
                 dash.add_trace(trace, row=row, col=col)
-            # Only propagate axis layout for xy-type subplots (not domain/table)
-            if not any(isinstance(tr, go.Table) for tr in panel_fig.data):
+            if not is_domain:
                 _propagate_layout(dash, panel_fig, row, col)
 
         dash.update_layout(
-            title={"text": "PMCC Backtest Dashboard", "x": 0.5},
-            height=280 * rows + 80,
+            title={"text": self._title, "x": 0.5},
+            height=PANEL_HEIGHT * rows + 80,
         )
         return dash
 

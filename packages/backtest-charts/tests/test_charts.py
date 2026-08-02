@@ -21,22 +21,26 @@ SPY (100 trades across leaps + short_call legs). Regenerate via::
     "
 """
 
-import json
 import os
 import pickle
 import tempfile
 import types
 from pathlib import Path
 
-import altair as alt
 import pandas as pd
-import vl_convert
+import plotly.graph_objects as go
+import pytest
+from backtest_charts import PANEL_REGISTRY
+from backtest_charts import BacktestData
+from backtest_charts import BacktestReport
 from backtest_charts import plot_cumulative_pnl
 from backtest_charts import plot_dashboard
 from backtest_charts import plot_equity_curve
 from backtest_charts import plot_exit_breakdown
 from backtest_charts import plot_pnl_distribution
 from backtest_charts import plot_portfolio
+from backtest_charts._util import _empty_chart
+from backtest_charts.summary import plot_summary
 
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "portfolio_result.pkl"
@@ -50,7 +54,6 @@ def _load_result():
     if _FIXTURE.exists():
         with open(_FIXTURE, "rb") as f:
             return pickle.load(f)
-    # Fallback when fixture isn't available (e.g. fresh checkout without data)
     return _empty_result()
 
 
@@ -64,146 +67,333 @@ def _empty_result():
     )
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────
+def _make_report(result=None, capital=100_000.0):
+    """Create a BacktestReport from the fixture or given result."""
+    return BacktestReport(result or _load_result(), capital=capital)
 
 
-def _render_to_svg(chart):
-    """Render a chart spec to SVG via vl-convert; raises on invalid spec."""
-    spec = json.loads(chart.to_json())
-    return vl_convert.vegalite_to_svg(spec)
+# ══════════════════════════════════════════════════════════════════════════
+# BacktestData tests
+# ══════════════════════════════════════════════════════════════════════════
 
 
-# ── Real-data tests ───────────────────────────────────────────────────────
+class TestBacktestData:
+    """BacktestData extraction and validation."""
+
+    def test_from_result_extracts_fields(self) -> None:
+        """from_result extracts all fields from a real PortfolioResult."""
+        result = _load_result()
+        data = BacktestData.from_result(result, 100_000.0)
+        assert data.capital == 100_000.0
+        assert data.has_equity
+        assert data.has_trades
+        assert len(data.trade_log) >= 50
+        assert "leg" in data.trade_log.columns
+        assert len(data.leg_names) == 2
+        assert "leaps" in data.leg_results
+        assert "short_call" in data.leg_results
+
+    def test_from_result_handles_empty(self) -> None:
+        """from_result handles empty result gracefully."""
+        data = BacktestData.from_result(_empty_result(), 50_000.0)
+        assert not data.has_trades
+        assert not data.has_equity
+        assert data.capital == 50_000.0
+        assert data.leg_names == []
+
+    def test_from_result_handles_missing_attrs(self) -> None:
+        """from_result handles objects missing optional attributes."""
+        minimal = types.SimpleNamespace()
+        data = BacktestData.from_result(minimal, 10_000.0)
+        assert not data.has_trades
+        assert not data.has_equity
+
+    def test_capital_must_be_positive(self) -> None:
+        """from_result rejects non-positive capital."""
+        with pytest.raises(ValueError, match="capital must be positive"):
+            BacktestData.from_result(_empty_result(), 0)
+        with pytest.raises(ValueError, match="capital must be positive"):
+            BacktestData.from_result(_empty_result(), -100)
+
+    def test_frozen_immutability(self) -> None:
+        """BacktestData is frozen and cannot be modified."""
+        data = BacktestData.from_result(_empty_result(), 10_000.0)
+        with pytest.raises(AttributeError):
+            data.capital = 999  # type: ignore[misc]
+
+    def test_has_trades_property(self) -> None:
+        """has_trades reflects trade_log emptiness."""
+        assert not BacktestData.from_result(_empty_result(), 10_000.0).has_trades
+        assert BacktestData.from_result(_load_result(), 100_000.0).has_trades
+
+    def test_has_equity_property(self) -> None:
+        """has_equity reflects equity_curve emptiness."""
+        assert not BacktestData.from_result(_empty_result(), 10_000.0).has_equity
+        assert BacktestData.from_result(_load_result(), 100_000.0).has_equity
 
 
-class TestRealDataRendering:
-    """Charts must render valid SVG from a real PortfolioResult."""
+# ══════════════════════════════════════════════════════════════════════════
+# BacktestReport tests
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestBacktestReport:
+    """BacktestReport OOP API tests."""
+
+    def test_construction(self) -> None:
+        """BacktestReport constructs from a real result."""
+        report = _make_report()
+        assert report.capital == 100_000.0
+        assert report.data.has_trades
+
+    def test_plot_equity_returns_figure(self) -> None:
+        """plot_equity returns a Figure with traces and a reference line."""
+        report = _make_report()
+        fig = report.plot_equity()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 1
+        assert len(fig.layout.shapes) >= 1
+
+    def test_plot_cum_pnl_returns_figure(self) -> None:
+        """plot_cum_pnl returns a Figure with traces per leg."""
+        report = _make_report()
+        fig = report.plot_cum_pnl()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 2
+
+    def test_plot_pnl_dist_returns_figure(self) -> None:
+        """plot_pnl_dist returns a Figure with a bar trace."""
+        report = _make_report()
+        fig = report.plot_pnl_dist()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 1
+
+    def test_plot_exits_returns_figure(self) -> None:
+        """plot_exits returns a Figure with stacked bar traces."""
+        report = _make_report()
+        fig = report.plot_exits()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 2
+
+    def test_plot_summary_returns_figure(self) -> None:
+        """plot_summary returns a Figure with a table trace."""
+        report = _make_report()
+        fig = report.plot_summary()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 1
+        # Should be a Table trace
+        assert isinstance(fig.data[0], go.Table)
+
+    def test_dashboard_has_5_panels(self) -> None:
+        """Dashboard includes all 5 default panels."""
+        report = _make_report()
+        fig = report.plot_dashboard()
+        assert isinstance(fig, go.Figure)
+        # 5 panels: equity(1 trace) + cum_pnl(2 traces) + pnl_dist(1) + exits(2) + summary(1) = 7 traces
+        assert len(fig.data) >= 5
+
+    def test_dashboard_subplot_titles(self) -> None:
+        """Dashboard subplot titles contain all 5 panel titles."""
+        report = _make_report()
+        fig = report.plot_dashboard()
+        titles = [ann.text for ann in fig.layout.annotations if ann.text]
+        assert "Portfolio Equity Curve" in titles
+        assert "Cumulative P&L by Leg" in titles
+        assert "Strategy Summary" in titles
+
+    def test_save_html(self) -> None:
+        """save_html writes an HTML file with embedded Plotly."""
+        report = _make_report()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "test_dashboard.html")
+            path = report.save_html(path=out)
+            assert os.path.isfile(path)
+            content = Path(path).read_text(encoding="utf-8")
+            assert "plotly" in content
+            assert "<html>" in content
+
+    def test_save_html_returns_absolute_path(self) -> None:
+        """save_html returns an absolute path."""
+        report = _make_report()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "test.html")
+            path = report.save_html(path=out)
+            assert os.path.isabs(path)
+
+    def test_empty_data_dashboard(self) -> None:
+        """Empty result still produces a renderable dashboard."""
+        report = BacktestReport(_empty_result(), capital=10_000.0)
+        fig = report.plot_dashboard()
+        assert isinstance(fig, go.Figure)
+        fig.to_dict()  # should not raise
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Summary panel tests
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestSummaryPanel:
+    """Summary go.Table panel tests."""
+
+    def test_summary_renders_table(self) -> None:
+        """Summary produces a Table trace with metrics."""
+        data = BacktestData.from_result(_load_result(), 100_000.0)
+        fig = plot_summary(data)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 1
+        assert isinstance(fig.data[0], go.Table)
+
+    def test_summary_has_all_metrics(self) -> None:
+        """Summary table contains all expected metric groups."""
+        data = BacktestData.from_result(_load_result(), 100_000.0)
+        fig = plot_summary(data)
+        table = fig.data[0]
+        metric_names = table.cells.values[0]  # type: ignore[index]
+        # Check group headers are present
+        name_strs = [str(n) for n in metric_names]
+        assert any("Performance" in n for n in name_strs)
+        assert any("Risk" in n for n in name_strs)
+        assert any("Trading" in n for n in name_strs)
+
+    def test_summary_empty_data(self) -> None:
+        """Empty data returns a placeholder figure."""
+        data = BacktestData.from_result(_empty_result(), 10_000.0)
+        fig = plot_summary(data)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0  # placeholder has no traces
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Panel extension tests
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class TestPanelExtension:
+    """Custom panel registration and per-instance isolation."""
+
+    def test_panel_decorator(self) -> None:
+        """@report.panel registers a custom panel."""
+        report = _make_report()
+        assert "custom" not in report.list_panels()
+
+        @report.panel("custom")
+        def custom(data: BacktestData) -> go.Figure:
+            return _empty_chart("Custom", "test")
+
+        assert "custom" in report.list_panels()
+        fig = report.plot_dashboard()
+        titles = [ann.text for ann in fig.layout.annotations if ann.text]
+        assert "Custom" in titles
+
+    def test_add_and_remove_panel(self) -> None:
+        """add_panel and remove_panel work correctly."""
+        report = _make_report()
+        original_count = len(report.list_panels())
+        report.add_panel("extra", lambda data: _empty_chart("Extra", "test"))
+        assert len(report.list_panels()) == original_count + 1
+        report.remove_panel("extra")
+        assert "extra" not in report.list_panels()
+
+    def test_remove_default_panel(self) -> None:
+        """Removing a default panel reduces the dashboard."""
+        report = _make_report()
+        report.remove_panel("exit_breakdown")
+        assert "exit_breakdown" not in report.list_panels()
+        fig = report.plot_dashboard()
+        # Should have fewer traces than with 5 panels
+        assert isinstance(fig, go.Figure)
+
+    def test_per_instance_isolation(self) -> None:
+        """Different report instances have independent panel registries."""
+        r1 = _make_report()
+        r2 = _make_report()
+        r1.remove_panel("exit_breakdown")
+        assert "exit_breakdown" not in r1.list_panels()
+        assert "exit_breakdown" in r2.list_panels()
+
+    def test_list_panels_default(self) -> None:
+        """Default panels are registered in order."""
+        report = _make_report()
+        keys = report.list_panels()
+        assert keys == ["equity_curve", "cumulative_pnl", "pnl_distribution", "exit_breakdown", "summary"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Legacy API tests (backward compat)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+class TestLegacyRealDataRendering:
+    """Legacy function API still works with real data."""
 
     def test_fixture_loaded(self) -> None:
         """The real-data fixture is present with trades."""
         result = _load_result()
-        assert not result.trade_log.empty, "fixture should have trades"
-        assert len(result.trade_log) >= 50, "fixture should have substantial trades"
-        assert "leg" in result.trade_log.columns
-        assert "exit_type" in result.trade_log.columns
+        assert not result.trade_log.empty
+        assert len(result.trade_log) >= 50
 
-    def test_equity_curve_renders(self) -> None:
-        """Equity curve produces valid SVG."""
+    def test_equity_curve_renders(self) -> None:  # noqa: D102
         result = _load_result()
-        chart = plot_equity_curve(result, 100_000.0)
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
-        assert len(svg) > 1000
+        fig = plot_equity_curve(result, 100_000.0)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 1
 
-    def test_cumulative_pnl_renders(self) -> None:
-        """Cumulative P&L produces valid SVG."""
+    def test_cumulative_pnl_renders(self) -> None:  # noqa: D102
         result = _load_result()
-        chart = plot_cumulative_pnl(result)
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
-        assert len(svg) > 1000
+        fig = plot_cumulative_pnl(result)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 2
 
-    def test_pnl_distribution_renders(self) -> None:
-        """P&L distribution produces valid SVG."""
+    def test_pnl_distribution_renders(self) -> None:  # noqa: D102
         result = _load_result()
-        chart = plot_pnl_distribution(result)
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
-        assert len(svg) > 1000
+        fig = plot_pnl_distribution(result)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 1
 
-    def test_exit_breakdown_renders(self) -> None:
-        """Exit breakdown produces valid SVG."""
+    def test_exit_breakdown_renders(self) -> None:  # noqa: D102
         result = _load_result()
-        chart = plot_exit_breakdown(result)
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
-        assert len(svg) > 1000
+        fig = plot_exit_breakdown(result)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 2
 
-    def test_dashboard_renders(self) -> None:
-        """Full dashboard produces valid SVG with all four panels."""
+    def test_dashboard_renders(self) -> None:  # noqa: D102
         result = _load_result()
-        chart = plot_dashboard(result, 100_000.0)
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
-        # Dashboard SVG should be substantial (4 panels)
-        assert len(svg) > 50_000
-
-    def test_dashboard_has_all_panels(self) -> None:
-        """Dashboard spec contains all 4 subcharts with data."""
-        result = _load_result()
-        chart = plot_dashboard(result, 100_000.0)
-        spec = json.loads(chart.to_json())
-        rows = spec.get("vconcat", [])
-        assert len(rows) == 2, "dashboard should have 2 rows"
-
-        titles = []
-        for row in rows:
-            for child in row.get("hconcat", []):
-                if "title" in child:
-                    titles.append(child["title"])
-
-        assert "Cumulative P&L by Leg" in titles
-        assert "Exit Type Breakdown" in titles
-        assert "Per-Trade P&L Distribution" in titles
+        fig = plot_dashboard(result, 100_000.0)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) >= 4
 
 
-# ── Type tests ────────────────────────────────────────────────────────────
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+class TestLegacyChartTypes:
+    """Legacy functions return go.Figure."""
+
+    def test_equity_curve_returns_figure(self) -> None:  # noqa: D102
+        fig = plot_equity_curve(_load_result(), 100_000.0)
+        assert isinstance(fig, go.Figure)
+
+    def test_dashboard_returns_figure(self) -> None:  # noqa: D102
+        fig = plot_dashboard(_load_result(), 100_000.0)
+        assert isinstance(fig, go.Figure)
+        assert hasattr(fig, "write_html")
 
 
-class TestChartTypes:
-    """Chart functions return the expected Altair types."""
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+class TestLegacyHtmlOutput:
+    """Legacy plot_portfolio writes valid HTML."""
 
-    def test_equity_curve_returns_chart(self) -> None:
-        """plot_equity_curve returns an Altair chart (LayerChart when composed)."""
-        result = _load_result()
-        chart = plot_equity_curve(result, 100_000.0)
-        assert isinstance(chart, (alt.Chart, alt.LayerChart))
-
-    def test_cumulative_pnl_returns_chart(self) -> None:
-        """plot_cumulative_pnl returns an alt.Chart."""
-        result = _load_result()
-        chart = plot_cumulative_pnl(result)
-        assert isinstance(chart, alt.Chart)
-
-    def test_pnl_distribution_returns_chart(self) -> None:
-        """plot_pnl_distribution returns an alt.Chart."""
-        result = _load_result()
-        chart = plot_pnl_distribution(result)
-        assert isinstance(chart, alt.Chart)
-
-    def test_exit_breakdown_returns_chart(self) -> None:
-        """plot_exit_breakdown returns an alt.Chart."""
-        result = _load_result()
-        chart = plot_exit_breakdown(result)
-        assert isinstance(chart, alt.Chart)
-
-    def test_dashboard_returns_compound(self) -> None:
-        """plot_dashboard returns a compound chart with save capability."""
-        result = _load_result()
-        chart = plot_dashboard(result, 100_000.0)
-        assert hasattr(chart, "save")
-
-
-# ── HTML output tests ─────────────────────────────────────────────────────
-
-
-class TestHtmlOutput:
-    """plot_portfolio writes a valid HTML file."""
-
-    def test_portfolio_saves_html(self) -> None:
-        """plot_portfolio writes an HTML file with embedded vega-embed."""
+    def test_portfolio_saves_html(self) -> None:  # noqa: D102
         result = _load_result()
         with tempfile.TemporaryDirectory() as tmpdir:
             out = os.path.join(tmpdir, "test_dashboard.html")
             path = plot_portfolio(result, 100_000.0, out_path=out)
             assert os.path.isfile(path)
             content = Path(path).read_text(encoding="utf-8")
-            assert "vegaEmbed" in content
-            assert "actions" in content
-            assert "<!DOCTYPE html>" in content
+            assert "plotly" in content
+            assert "<html>" in content
 
-    def test_portfolio_returns_absolute_path(self) -> None:
-        """plot_portfolio returns an absolute path."""
+    def test_portfolio_returns_absolute_path(self) -> None:  # noqa: D102
         result = _load_result()
         with tempfile.TemporaryDirectory() as tmpdir:
             out = os.path.join(tmpdir, "test.html")
@@ -211,41 +401,58 @@ class TestHtmlOutput:
             assert os.path.isabs(path)
 
 
-# ── Empty-data tests ──────────────────────────────────────────────────────
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+class TestLegacyEmptyData:
+    """Legacy functions handle empty data gracefully."""
+
+    def test_equity_curve_empty(self) -> None:  # noqa: D102
+        fig = plot_equity_curve(_empty_result(), 100_000.0)
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0
+
+    def test_cumulative_pnl_empty(self) -> None:  # noqa: D102
+        fig = plot_cumulative_pnl(_empty_result())
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0
+
+    def test_pnl_distribution_empty(self) -> None:  # noqa: D102
+        fig = plot_pnl_distribution(_empty_result())
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0
+
+    def test_exit_breakdown_empty(self) -> None:  # noqa: D102
+        fig = plot_exit_breakdown(_empty_result())
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 0
+
+    def test_dashboard_empty(self) -> None:  # noqa: D102
+        fig = plot_dashboard(_empty_result(), 100_000.0)
+        assert isinstance(fig, go.Figure)
+        fig.to_dict()
 
 
-class TestEmptyData:
-    """Charts handle empty data gracefully."""
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+class TestLegacyPanelRegistry:
+    """Legacy PANEL_REGISTRY still works."""
 
-    def test_equity_curve_empty(self) -> None:
-        """Empty equity curve returns a placeholder chart."""
-        result = _empty_result()
-        chart = plot_equity_curve(result, 100_000.0)
-        assert isinstance(chart, alt.Chart)
+    def test_default_panels_registered(self) -> None:  # noqa: D102
+        assert "equity_curve" in PANEL_REGISTRY
+        assert "cumulative_pnl" in PANEL_REGISTRY
+        assert "pnl_distribution" in PANEL_REGISTRY
+        assert "exit_breakdown" in PANEL_REGISTRY
 
-    def test_cumulative_pnl_empty(self) -> None:
-        """Empty trade log returns a placeholder chart."""
-        result = _empty_result()
-        chart = plot_cumulative_pnl(result)
-        assert isinstance(chart, alt.Chart)
+    def test_deregister_and_reregister(self) -> None:  # noqa: D102
+        factory = PANEL_REGISTRY["exit_breakdown"]
+        PANEL_REGISTRY.deregister("exit_breakdown")
+        assert "exit_breakdown" not in PANEL_REGISTRY
+        # Re-register to restore defaults
+        PANEL_REGISTRY.register("exit_breakdown", factory)
 
-    def test_pnl_distribution_empty(self) -> None:
-        """Empty trade log returns a placeholder chart."""
-        result = _empty_result()
-        chart = plot_pnl_distribution(result)
-        assert isinstance(chart, alt.Chart)
-
-    def test_exit_breakdown_empty(self) -> None:
-        """Empty trade log returns a placeholder chart."""
-        result = _empty_result()
-        chart = plot_exit_breakdown(result)
-        assert isinstance(chart, alt.Chart)
-
-    def test_dashboard_empty(self) -> None:
-        """Empty result still produces a renderable dashboard."""
-        result = _empty_result()
-        chart = plot_dashboard(result, 100_000.0)
-        assert hasattr(chart, "save")
-        # Should still render valid SVG
-        svg = _render_to_svg(chart)
-        assert "<svg" in svg
+    def test_custom_panel(self) -> None:  # noqa: D102
+        PANEL_REGISTRY.register("custom", lambda data: _empty_chart("Custom", "test"))
+        result = _load_result()
+        fig = plot_dashboard(result, 100_000.0)
+        titles = [ann.text for ann in fig.layout.annotations if ann.text]
+        assert "Custom" in titles
+        # Clean up
+        PANEL_REGISTRY.deregister("custom")

@@ -9,17 +9,19 @@ import os
 import typing
 from collections import OrderedDict
 
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from backtest_charts._util import DEFAULT_CAPITAL
-from backtest_charts._util import PANEL_HEIGHT
 from backtest_charts.data import BacktestData
+from backtest_charts.data import compute_benchmarks
 from backtest_charts.equity import plot_equity
 from backtest_charts.exits import plot_exits
 from backtest_charts.pnl import plot_cum_pnl
 from backtest_charts.pnl import plot_pnl_dist
 from backtest_charts.summary import plot_summary
+from backtest_charts.trades import plot_trades
 
 
 # Type alias for panel factory functions
@@ -32,6 +34,7 @@ DEFAULT_PANELS: OrderedDict[str, PanelFactory] = OrderedDict(
         ("cumulative_pnl", plot_cum_pnl),
         ("pnl_distribution", plot_pnl_dist),
         ("exit_breakdown", plot_exits),
+        ("trade_log", plot_trades),
         ("summary", plot_summary),
     ]
 )
@@ -102,17 +105,100 @@ class BacktestReport:
             return fig
     """
 
-    def __init__(self, result, capital: float = DEFAULT_CAPITAL, *, title: str = "Backtest Dashboard") -> None:
+    def __init__(
+        self,
+        result,
+        capital: float = DEFAULT_CAPITAL,
+        *,
+        title: str = "Backtest Dashboard",
+        benchmark_options: dict[str, "pd.DataFrame"] | None = None,
+        stock_data: dict[str, "pd.DataFrame"] | None = None,
+        benchmark_results: dict[str, object] | None = None,
+    ) -> None:
         """Create a BacktestReport from a backtest result.
 
         Args:
             result: Backtest result object (duck-typed).
             capital: Initial capital for reference lines.
             title: Dashboard title (shown in the dashboard header).
+            benchmark_options: Optional mapping of symbol → option chain
+                DataFrame used to compute buy-and-hold ATM call benchmarks.
+                When provided, the summary table includes return rows for
+                each symbol in :data:`~backtest_charts.data.BENCHMARK_SYMBOLS`
+                (default SPY, QQQ, IWM).  Each DataFrame must have columns:
+                ``quote_date``, ``expiration``, ``option_type``, ``strike``,
+                ``bid``, ``ask``, ``delta``.
+            stock_data: Optional mapping of symbol → stock OHLCV DataFrame.
+                When provided, the equity curve chart overlays each symbol's
+                close price on a secondary y-axis (log scale).  Each DataFrame
+                must have columns: ``quote_date``, ``close``.
+            benchmark_results: Optional mapping of label → backtest result
+                object (duck-typed with ``equity_curve`` attribute).  When
+                provided, each result's equity curve is overlaid on the
+                equity chart as a dashed line (percentage change from start),
+                enabling visual comparison against benchmark strategies.
         """
         self._data = BacktestData.from_result(result, capital)
         self._panels: OrderedDict[str, PanelFactory] = OrderedDict(DEFAULT_PANELS)
         self._title = title
+
+        # Inject stock price data into BacktestData
+        if stock_data:
+            prices: dict[str, pd.Series] = {}
+            for sym, sdf in stock_data.items():
+                sdf = sdf.copy()
+                sdf["quote_date"] = pd.to_datetime(sdf["quote_date"])
+                sdf = sdf.sort_values("quote_date").set_index("quote_date")
+                prices[sym] = sdf["close"]
+            self._data.stock_prices.update(prices)
+
+        # Inject benchmark equity curves and summaries into BacktestData
+        if benchmark_results:
+            bm_equity: dict[str, pd.Series] = {}
+            bm_summaries: dict[str, dict] = {}
+            for label, bm_result in benchmark_results.items():
+                ec = getattr(bm_result, "equity_curve", None)
+                if ec is not None and not ec.empty:
+                    ec = ec.copy()
+                    if not isinstance(ec.index, pd.DatetimeIndex):
+                        ec.index = pd.to_datetime(ec.index)
+                    bm_equity[label] = ec
+                bm_summary = getattr(bm_result, "summary", None)
+                if bm_summary and isinstance(bm_summary, dict):
+                    # Compute annualized return for benchmark
+                    bm_total_return = bm_summary.get("total_return")
+                    if bm_total_return is not None and not ec.empty:
+                        bm_start = pd.Timestamp(ec.index.min())
+                        bm_end = pd.Timestamp(ec.index.max())
+                        bm_years = (bm_end - bm_start).days / 365.25
+                        if bm_years > 0:
+                            bm_summary["annualized_return"] = (1 + bm_total_return) ** (1 / bm_years) - 1
+                    bm_summaries[label] = bm_summary
+            self._data.benchmark_equity.update(bm_equity)
+            self._data.benchmark_summaries.update(bm_summaries)
+
+        # Compute benchmarks and inject into summary dict
+        if benchmark_options and self._data.has_trades:
+            tl = self._data.trade_log
+            start = pd.Timestamp(tl["entry_date"].min())
+            end = pd.Timestamp(tl["exit_date"].max())
+            benchmarks = compute_benchmarks(benchmark_options, start, end)
+            # Mutate the summary dict (BacktestData is frozen but summary is a dict)
+            self._data.summary.update(benchmarks)
+
+        # Compute annualized return and MAR ratio
+        if self._data.has_trades:
+            tl = self._data.trade_log
+            start = pd.Timestamp(tl["entry_date"].min())
+            end = pd.Timestamp(tl["exit_date"].max())
+            years = (end - start).days / 365.25
+            summary = self._data.summary
+            total_return = summary.get("total_return")
+            max_dd = summary.get("max_drawdown")
+            if years > 0 and total_return is not None:
+                summary["annualized_return"] = (1 + total_return) ** (1 / years) - 1
+            if total_return is not None and max_dd is not None and max_dd != 0:
+                summary["mar_ratio"] = total_return / abs(max_dd)
 
     @property
     def data(self) -> BacktestData:
@@ -213,7 +299,8 @@ class BacktestReport:
 
         dash.update_layout(
             title={"text": self._title, "x": 0.5},
-            height=PANEL_HEIGHT * rows + 80,
+            autosize=True,
+            height=280 * rows + 80,
         )
         return dash
 

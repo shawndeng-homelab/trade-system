@@ -42,6 +42,38 @@ def load_pmcc_data(
     return options, stock
 
 
+def load_benchmark_data(
+    symbol: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> tuple:
+    """Load option chain and stock data for benchmark backtesting.
+
+    Loads the full option chain and stock OHLCV from the optopsy parquet
+    cache.  The benchmark strategy uses LEAPS-range DTE (up to 730 days),
+    so no expiration type filtering is applied.
+
+    Data must be pre-downloaded via the ``optopsy-data`` CLI::
+
+        EODHD_API_KEY=... optopsy-data download SPY        # options
+        optopsy-data download SPY -s                       # stock OHLCV
+
+    Args:
+        symbol: Ticker symbol (e.g. "SPY").
+        start_date: Optional start date (YYYY-MM-DD).
+        end_date: Optional end date (YYYY-MM-DD).
+
+    Returns:
+        (options_df, stock_df) tuple.
+
+    Raises:
+        FileNotFoundError: If no cached data exists for *symbol*.
+    """
+    options = op.load_cached_options(symbol, start_date, end_date)
+    stock = op.load_cached_stocks(symbol, start_date, end_date)
+    return options, stock
+
+
 def load_odte_data(
     symbol: str,
     start_date: str | None = None,

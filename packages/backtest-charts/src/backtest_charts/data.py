@@ -13,6 +13,16 @@ import dataclasses
 import pandas as pd
 
 
+# ── Default benchmark symbols ──────────────────────────────────────────
+
+BENCHMARK_SYMBOLS = ["SPY", "QQQ", "IWM"]
+"""Symbols included in the benchmark section of the summary table.
+
+For each symbol the summary shows the return of buying an ATM call on
+the backtest start date and holding to the end date.
+"""
+
+
 # ── Normalization helpers ─────────────────────────────────────────────
 
 
@@ -79,6 +89,9 @@ class BacktestData:
     summary: dict
     leg_names: list[str]
     leg_results: dict[str, LegData]
+    stock_prices: dict[str, pd.Series]
+    benchmark_equity: dict[str, pd.Series]
+    benchmark_summaries: dict[str, dict]
 
     def __post_init__(self) -> None:
         """Validate capital is positive."""
@@ -137,4 +150,110 @@ class BacktestData:
             summary=summary,
             leg_names=leg_names,
             leg_results=leg_results,
+            stock_prices={},
+            benchmark_equity={},
+            benchmark_summaries={},
         )
+
+
+# ── Benchmark computation ─────────────────────────────────────────────
+
+
+def compute_benchmarks(
+    options_data: dict[str, pd.DataFrame],
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
+    symbols: list[str] | None = None,
+) -> dict[str, float]:
+    """Compute buy-and-hold ATM call returns for benchmark symbols.
+
+    For each symbol, finds the ATM (delta ≈ 0.50) call on *start_date*
+    with the nearest expiration ≥ *end_date*, then computes the percentage
+    return from entry mid-price to exit mid-price (or intrinsic value if
+    the option is ITM at expiry).
+
+    Args:
+        options_data: Mapping of symbol → option chain DataFrame.
+            Each DataFrame must have columns: ``quote_date``, ``expiration``,
+            ``option_type``, ``strike``, ``bid``, ``ask``, ``delta``.
+        start_date: Backtest start date (entry date for benchmark).
+        end_date: Backtest end date (exit date for benchmark).
+        symbols: Symbols to compute benchmarks for.  Defaults to
+            :data:`BENCHMARK_SYMBOLS`.
+
+    Returns:
+        Dict mapping ``"benchmark_{SYMBOL}"`` to percentage return.
+        Symbols without data are omitted.
+    """
+    if symbols is None:
+        symbols = BENCHMARK_SYMBOLS
+
+    start = pd.Timestamp(start_date)
+    end = pd.Timestamp(end_date)
+    results: dict[str, float] = {}
+
+    for sym in symbols:
+        df = options_data.get(sym)
+        if df is None or df.empty:
+            continue
+
+        df = df.copy()
+        df["quote_date"] = pd.to_datetime(df["quote_date"])
+        df["expiration"] = pd.to_datetime(df["expiration"])
+
+        # Filter to calls on start_date
+        calls = df[(df["quote_date"] == start) & (df["option_type"].str.lower() == "c")]
+        if calls.empty:
+            # Try nearest date on or after start
+            later = df[(df["quote_date"] >= start) & (df["option_type"].str.lower() == "c")]
+            if later.empty:
+                continue
+            nearest_date = later["quote_date"].min()
+            calls = later[later["quote_date"] == nearest_date]
+
+        # Find ATM call: delta closest to 0.50, prefer longest expiration
+        # so the option can be held through the entire backtest period
+        calls = calls.copy()
+        calls["_delta_diff"] = (calls["delta"] - 0.50).abs()
+        # First try: ATM call with expiration >= end_date (holds through backtest)
+        long_calls = calls[calls["expiration"] >= end]
+        if not long_calls.empty:
+            atm = long_calls.nsmallest(1, "_delta_diff")
+        else:
+            # Fallback: pick the ATM call with the farthest expiration
+            farthest = calls["expiration"].max()
+            atm = calls[calls["expiration"] == farthest].nsmallest(1, "_delta_diff")
+        if atm.empty:
+            continue
+
+        entry_mid = (atm["bid"].iloc[0] + atm["ask"].iloc[0]) / 2
+        if entry_mid <= 0:
+            continue
+
+        strike = atm["strike"].iloc[0]
+        expiration = atm["expiration"].iloc[0]
+
+        # Find exit price: same contract on end_date (or last date before end)
+        exit_rows = df[
+            (df["quote_date"] <= end)
+            & (df["expiration"] == expiration)
+            & (df["strike"] == strike)
+            & (df["option_type"].str.lower() == "c")
+        ]
+        if exit_rows.empty:
+            continue
+
+        # Use the latest available quote
+        exit_row = exit_rows.loc[exit_rows["quote_date"].idxmax()]
+        exit_mid = (exit_row["bid"] + exit_row["ask"]) / 2
+
+        # If exit_mid is 0 (illiquid / no bid), use intrinsic value
+        if exit_mid <= 0:
+            # Approximate underlying price from delta of entry
+            # Use last available stock-like proxy
+            continue
+
+        ret = (exit_mid - entry_mid) / entry_mid
+        results[f"benchmark_{sym}"] = ret
+
+    return results

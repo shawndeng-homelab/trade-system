@@ -100,6 +100,12 @@ class TestBacktestData:
         assert not data.has_equity
         assert data.capital == 50_000.0
         assert data.leg_names == []
+        assert data.benchmark_equity == {}
+
+    def test_from_result_initializes_benchmark_equity(self) -> None:
+        """from_result initializes benchmark_equity as an empty dict."""
+        data = BacktestData.from_result(_load_result(), 100_000.0)
+        assert data.benchmark_equity == {}
 
     def test_from_result_handles_missing_attrs(self) -> None:
         """from_result handles objects missing optional attributes."""
@@ -184,12 +190,12 @@ class TestBacktestReport:
         # Should be a Table trace
         assert isinstance(fig.data[0], go.Table)
 
-    def test_dashboard_has_5_panels(self) -> None:
-        """Dashboard includes all 5 default panels."""
+    def test_dashboard_has_6_panels(self) -> None:
+        """Dashboard includes all 6 default panels."""
         report = _make_report()
         fig = report.plot_dashboard()
         assert isinstance(fig, go.Figure)
-        # 5 panels: equity(1 trace) + cum_pnl(2 traces) + pnl_dist(1) + exits(2) + summary(1) = 7 traces
+        # 6 panels: equity + cum_pnl + pnl_dist + exits + trade_log + summary
         assert len(fig.data) >= 5
 
     def test_dashboard_subplot_titles(self) -> None:
@@ -226,6 +232,52 @@ class TestBacktestReport:
         fig = report.plot_dashboard()
         assert isinstance(fig, go.Figure)
         fig.to_dict()  # should not raise
+
+    def test_benchmark_results_injects_equity(self) -> None:
+        """benchmark_results parameter injects equity curves into data."""
+        result = _load_result()
+        bm_ec = pd.Series(
+            [100_000, 101_000, 102_000],
+            index=pd.to_datetime(["2024-08-01", "2024-08-02", "2024-08-03"]),
+        )
+        bm_result = types.SimpleNamespace(equity_curve=bm_ec)
+        report = BacktestReport(
+            result,
+            capital=100_000.0,
+            benchmark_results={"SPY ATM": bm_result},
+        )
+        assert "SPY ATM" in report.data.benchmark_equity
+        assert len(report.data.benchmark_equity["SPY ATM"]) == 3
+
+    def test_benchmark_results_without_equity_curve(self) -> None:
+        """benchmark_results with missing equity_curve is handled gracefully."""
+        result = _load_result()
+        bm_result = types.SimpleNamespace()  # no equity_curve attribute
+        report = BacktestReport(
+            result,
+            capital=100_000.0,
+            benchmark_results={"SPY ATM": bm_result},
+        )
+        assert report.data.benchmark_equity == {}
+
+    def test_plot_equity_with_benchmark_overlay(self) -> None:
+        """plot_equity renders benchmark overlay traces when benchmark_equity is populated."""
+        result = _load_result()
+        # Use dates that overlap with the fixture equity curve (2024-07-31 to 2026-07-21)
+        bm_ec = pd.Series(
+            [100_000, 101_000, 102_000],
+            index=pd.to_datetime(["2024-08-01", "2024-08-02", "2024-08-03"]),
+        )
+        bm_result = types.SimpleNamespace(equity_curve=bm_ec)
+        report = BacktestReport(
+            result,
+            capital=100_000.0,
+            benchmark_results={"SPY ATM": bm_result},
+        )
+        fig = report.plot_equity()
+        assert isinstance(fig, go.Figure)
+        # Should have at least 2 traces: strategy equity + benchmark overlay
+        assert len(fig.data) >= 2
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -316,7 +368,7 @@ class TestPanelExtension:
         """Default panels are registered in order."""
         report = _make_report()
         keys = report.list_panels()
-        assert keys == ["equity_curve", "cumulative_pnl", "pnl_distribution", "exit_breakdown", "summary"]
+        assert keys == ["equity_curve", "cumulative_pnl", "pnl_distribution", "exit_breakdown", "trade_log", "summary"]
 
 
 # ══════════════════════════════════════════════════════════════════════════

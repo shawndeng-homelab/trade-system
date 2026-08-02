@@ -26,6 +26,7 @@ import warnings
 import plotly.graph_objects as go
 
 from backtest_charts._util import DEFAULT_CAPITAL
+from backtest_charts.data import BENCHMARK_SYMBOLS
 from backtest_charts.data import BacktestData
 from backtest_charts.report import BacktestReport
 
@@ -33,7 +34,7 @@ from backtest_charts.report import BacktestReport
 # ── New API ───────────────────────────────────────────────────────────
 
 __all__ = [
-    # Backward compat (deprecated)
+    "BENCHMARK_SYMBOLS",
     "PANEL_REGISTRY",
     "BacktestData",
     "BacktestReport",

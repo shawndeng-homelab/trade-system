@@ -2,9 +2,12 @@
 
 import plotly.graph_objects as go
 
+from backtest_charts._util import _apply_chart_layout
 from backtest_charts._util import _empty_chart
 from backtest_charts.data import BacktestData
 
+
+_TITLE = "Strategy Summary"
 
 # Metric definitions: (dict_key, display_label, format_string)
 _METRIC_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
@@ -47,13 +50,24 @@ _METRIC_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
 ]
 
 
-def _format_value(key: str, value: object, fmt: str) -> str:
-    """Format a metric value, handling None and special cases."""
+def _format_value(value: object, fmt: str) -> str:
+    """Format a metric value using its format string.
+
+    For integer formats (``{:d}``), the value is cast to ``int`` first
+    to handle float-backed integer fields from optopsy.
+
+    Args:
+        value: The metric value (may be ``None``).
+        fmt: A Python format string (e.g. ``"{:.1%}"``, ``"{:d}"``).
+
+    Returns:
+        Formatted string, or ``"—"`` if value is ``None``.
+    """
     if value is None:
         return "—"
     try:
-        if key in ("total_trades", "winning_trades", "losing_trades"):
-            return str(int(value))
+        if fmt.endswith("d}"):
+            return fmt.format(int(value))
         return fmt.format(value)
     except (ValueError, TypeError):
         return str(value)
@@ -71,7 +85,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
         Plotly table figure with strategy metrics.
     """
     if not data.has_trades:
-        return _empty_chart("Strategy Summary", "No trade data")
+        return _empty_chart(_TITLE, "No trade data")
 
     summary = data.summary
     metric_names: list[str] = []
@@ -89,7 +103,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
         fill_colors[1].append(group_bg)
         for key, label, fmt in metrics:
             metric_names.append(f"  {label}")
-            metric_values.append(_format_value(key, summary.get(key), fmt))
+            metric_values.append(_format_value(summary.get(key), fmt))
             fill_colors[0].append(row_bg)
             fill_colors[1].append(row_bg)
 
@@ -112,10 +126,6 @@ def plot_summary(data: BacktestData) -> go.Figure:
             columnwidth=[300, 200],
         )
     )
-    fig.update_layout(
-        title={"text": "Strategy Summary", "x": 0.5},
-        width=580,
-        height=580,
-        margin={"l": 10, "r": 10, "t": 50, "b": 10},
-    )
+    _apply_chart_layout(fig, _TITLE, height=580)
+    fig.update_layout(margin={"l": 10, "r": 10, "t": 50, "b": 10})
     return fig

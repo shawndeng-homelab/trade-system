@@ -9,9 +9,34 @@ decoupling visualization from optopsy internals.
 """
 
 import dataclasses
-import typing
 
 import pandas as pd
+
+
+# ── Normalization helpers ─────────────────────────────────────────────
+
+
+def _normalize_equity_curve(ec: pd.Series | None) -> pd.Series:
+    """Return a date-indexed equity curve, or an empty Series if data is missing."""
+    if ec is None or (isinstance(ec, pd.Series) and ec.empty):
+        return pd.Series(dtype=float, name="equity")
+    ec = ec.copy()
+    if not isinstance(ec.index, pd.DatetimeIndex):
+        ec.index = pd.to_datetime(ec.index)
+    return ec
+
+
+def _normalize_trade_log(tl: pd.DataFrame | None) -> pd.DataFrame:
+    """Return a trade-log DataFrame, or an empty one if data is missing."""
+    return pd.DataFrame() if tl is None else tl.copy()
+
+
+def _normalize_summary(summary: dict | None) -> dict:
+    """Return a summary dict, or a minimal fallback if data is missing."""
+    return summary or {"total_trades": 0}
+
+
+# ── Data classes ──────────────────────────────────────────────────────
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,9 +79,6 @@ class BacktestData:
     summary: dict
     leg_names: list[str]
     leg_results: dict[str, LegData]
-    # Private: stored for backward-compat panel wrappers only.
-    # Not part of the public API — new code should use BacktestData fields.
-    _raw: typing.Any = dataclasses.field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Validate capital is positive."""
@@ -89,38 +111,17 @@ class BacktestData:
         Returns:
             Frozen ``BacktestData`` instance.
         """
-        # Equity curve
-        ec = getattr(result, "equity_curve", None)
-        if ec is None or (isinstance(ec, pd.Series) and ec.empty):
-            ec = pd.Series(dtype=float, name="equity")
-        elif isinstance(ec, pd.Series):
-            ec = ec.copy()
-            ec.index = pd.to_datetime(ec.index)
+        ec = _normalize_equity_curve(getattr(result, "equity_curve", None))
+        tl = _normalize_trade_log(getattr(result, "trade_log", None))
+        summary = _normalize_summary(getattr(result, "summary", None))
 
-        # Trade log
-        tl = getattr(result, "trade_log", None)
-        tl = pd.DataFrame() if tl is None else tl.copy()
-
-        # Summary
-        summary = getattr(result, "summary", None) or {"total_trades": 0}
-
-        # Leg results
         raw_legs = getattr(result, "leg_results", None) or {}
         leg_names: list[str] = []
         leg_results: dict[str, LegData] = {}
         for name, leg in raw_legs.items():
-            leg_ec = getattr(leg, "equity_curve", None)
-            if leg_ec is None or (isinstance(leg_ec, pd.Series) and leg_ec.empty):
-                leg_ec = pd.Series(dtype=float, name="equity")
-            elif isinstance(leg_ec, pd.Series):
-                leg_ec = leg_ec.copy()
-                leg_ec.index = pd.to_datetime(leg_ec.index)
-
-            leg_tl = getattr(leg, "trade_log", None)
-            leg_tl = pd.DataFrame() if leg_tl is None else leg_tl.copy()
-
-            leg_summary = getattr(leg, "summary", None) or {"total_trades": 0}
-
+            leg_ec = _normalize_equity_curve(getattr(leg, "equity_curve", None))
+            leg_tl = _normalize_trade_log(getattr(leg, "trade_log", None))
+            leg_summary = _normalize_summary(getattr(leg, "summary", None))
             leg_names.append(str(name))
             leg_results[str(name)] = LegData(
                 name=str(name),
@@ -136,5 +137,4 @@ class BacktestData:
             summary=summary,
             leg_names=leg_names,
             leg_results=leg_results,
-            _raw=result,
         )

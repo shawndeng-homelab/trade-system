@@ -2,8 +2,13 @@
 
 import plotly.graph_objects as go
 
+from backtest_charts._util import DEFAULT_CAPITAL
+from backtest_charts._util import _apply_chart_layout
 from backtest_charts._util import _empty_chart
 from backtest_charts.data import BacktestData
+
+
+_TITLE = "Exit Type Breakdown"
 
 
 def plot_exits(data: BacktestData) -> go.Figure:
@@ -17,7 +22,7 @@ def plot_exits(data: BacktestData) -> go.Figure:
     """
     log = data.trade_log
     if not data.has_trades or "exit_type" not in log.columns or "leg" not in log.columns:
-        return _empty_chart("Exit Type Breakdown", "No exit type data")
+        return _empty_chart(_TITLE, "No exit type data")
 
     counts = log.groupby(["leg", "exit_type"]).size().reset_index(name="count")
 
@@ -33,13 +38,11 @@ def plot_exits(data: BacktestData) -> go.Figure:
             )
         )
 
+    _apply_chart_layout(fig, _TITLE)
     fig.update_layout(
-        title={"text": "Exit Type Breakdown", "x": 0.5},
         xaxis_title="Exit type",
         yaxis_title="Count",
         barmode="stack",
-        width=580,
-        height=280,
     )
     return fig
 
@@ -51,4 +54,4 @@ def plot_exit_breakdown(result) -> go.Figure:
     .. deprecated:: 0.2.0
         Use :meth:`BacktestReport.plot_exits` instead.
     """
-    return plot_exits(BacktestData.from_result(result, capital=100_000.0))
+    return plot_exits(BacktestData.from_result(result, capital=DEFAULT_CAPITAL))

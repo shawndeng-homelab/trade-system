@@ -5,6 +5,7 @@ end-to-end strategy dispatch. All tests use fully synthetic data so no
 API keys or parquet caches are required.
 """
 
+import tempfile
 from datetime import UTC
 from datetime import date
 from datetime import datetime
@@ -236,7 +237,7 @@ def test_earnings_event_dates_weekday(tmp_path: Path) -> None:
     """Weekday report: entry=T-1, exit=T."""
     _seed_earnings_cache(tmp_path, "TEST.US", [pd.Timestamp("2024-02-05")])  # Monday
     stock = _synthetic_stock(start="2024-01-01", n_days=30)
-    cal = load_earnings_calendar(["TEST"], root=tmp_path)
+    cal = load_earnings_calendar(["TEST.US"], root=tmp_path)
     events = earnings_event_dates(stock, cal, EarningsOvernightConfig())
     assert len(events) == 1
     assert events.iloc[0]["report_date"] == pd.Timestamp("2024-02-05")
@@ -248,7 +249,7 @@ def test_earnings_event_dates_saturday(tmp_path: Path) -> None:
     """Saturday report: entry=Friday, exit=Monday."""
     _seed_earnings_cache(tmp_path, "TEST.US", [pd.Timestamp("2024-02-03")])  # Saturday
     stock = _synthetic_stock(start="2024-01-01", n_days=30)
-    cal = load_earnings_calendar(["TEST"], root=tmp_path)
+    cal = load_earnings_calendar(["TEST.US"], root=tmp_path)
     events = earnings_event_dates(stock, cal, EarningsOvernightConfig())
     assert len(events) == 1
     row = events.iloc[0]
@@ -260,7 +261,7 @@ def test_earnings_event_dates_outside_range(tmp_path: Path) -> None:
     """Earnings outside the stock data range → row dropped."""
     _seed_earnings_cache(tmp_path, "TEST.US", [pd.Timestamp("2030-01-01")])  # far future
     stock = _synthetic_stock(start="2024-01-01", n_days=30)
-    cal = load_earnings_calendar(["TEST"], root=tmp_path)
+    cal = load_earnings_calendar(["TEST.US"], root=tmp_path)
     events = earnings_event_dates(stock, cal, EarningsOvernightConfig())
     assert events.empty
 
@@ -269,7 +270,7 @@ def test_earnings_event_dates_no_overnight(tmp_path: Path) -> None:
     """Defensive: entry_date NaT (no prior trading day) → row dropped."""
     _seed_earnings_cache(tmp_path, "TEST.US", [pd.Timestamp("2024-01-02")])  # first day
     stock = _synthetic_stock(start="2024-01-02", n_days=1)
-    cal = load_earnings_calendar(["TEST"], root=tmp_path)
+    cal = load_earnings_calendar(["TEST.US"], root=tmp_path)
     events = earnings_event_dates(stock, cal, EarningsOvernightConfig())
     assert events.empty
 
@@ -517,13 +518,36 @@ def _full_options_for_two_events() -> pd.DataFrame:
 
 
 def test_run_earnings_overnight_no_events_survives() -> None:
-    """All events filtered out → ValueError before dispatch."""
+    """Empty calendar → ValueError with a download hint."""
     options_df, stock, _events = _two_event_setup()
-    # Force the cost cap to be so low that no candidate fits
     config = EarningsOvernightConfig(cost_cap_usd=0.001)
-    # Empty calendar → no events to process
-    with pytest.raises(ValueError, match="No earnings events survived"):
+    with pytest.raises(ValueError, match="Empty earnings calendar"):
         run_earnings_overnight(options_df, stock, {}, config)
+
+
+def test_run_earnings_overnight_no_events_survives_filters() -> None:
+    """Non-empty calendar but all events filtered → ValueError w/ a filter hint."""
+    # Seed a calendar with an event that has no matching options
+    with pytest.MonkeyPatch.context() as mp, tempfile.TemporaryDirectory() as tmp:
+        mp.setenv("OPTOPSY_DATA_DIR", tmp)
+        write_earnings(
+            "TEST.US",
+            EarningsCalendar(
+                events=[
+                    EarningsEvent(
+                        code="TEST.US",
+                        report_date=datetime(2024, 2, 5, tzinfo=UTC),
+                        session="amc",
+                    )
+                ]
+            ).to_dataframe(),
+        )
+        cal = load_earnings_calendar(["TEST.US"])
+        options_df, stock, _ = _two_event_setup()
+        # Cost cap so low nothing fits
+        config = EarningsOvernightConfig(cost_cap_usd=0.001)
+        with pytest.raises(ValueError, match="strike/liquidity filters"):
+            run_earnings_overnight(options_df, stock, cal, config)
 
 
 def test_run_earnings_overnight_smoke() -> None:

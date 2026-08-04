@@ -86,7 +86,20 @@ def run_earnings_overnight(
     calls_df, puts_df = split_options_by_side(selected)
 
     if calls_df.empty and puts_df.empty:
-        msg = "No earnings events survived strike/liquidity filters"
+        if not earnings_calendar:
+            # No earnings data at all — most likely the cache is empty
+            # for the requested symbol(s).
+            msg = (
+                "Empty earnings calendar. Populate the cache with:\n"
+                "    just download-earnings --symbols <SYMBOLS>\n"
+                "and ensure the symbols match the ones in your options cache."
+            )
+        else:
+            msg = (
+                "No earnings events survived strike/liquidity filters. "
+                "Loosen min_oi / min_volume / cost_cap_usd, or check that the "
+                "earnings dates fall within your options_df date range."
+            )
         raise ValueError(msg)
 
     # Re-filter the FULL options_df to keep all price rows for the pre-selected

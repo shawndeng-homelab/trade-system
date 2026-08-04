@@ -6,6 +6,11 @@ The strategy enters a single 2% OTM option (call or put, whichever has
 higher OI × Volume — "follow smart money") on the trading day before
 earnings, and exits the next day after the announcement.
 
+**Scope**: this strategy targets **individual stocks** that report
+quarterly earnings. ETFs (SPY, QQQ, IWM, etc.) don't file earnings in
+the EODHD feed and have empty earnings caches — running this on an
+ETF will raise ``ValueError("Empty earnings calendar")``.
+
 Known limitations (also documented in ``strategy.py``):
 
 - optopsy's data is EOD-only, so the "3:30 PM entry" is approximated by

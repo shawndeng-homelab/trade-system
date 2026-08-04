@@ -37,11 +37,12 @@ def load_earnings_calendar(
 ) -> dict[str, list[pd.Timestamp]]:
     """Read the local earnings cache for each symbol.
 
-    Returns a mapping ``code -> [sorted report_date Timestamps]``. Missing
+    Returns a mapping ``user_symbol -> [sorted report_date Timestamps]``.
+    The keys are the symbols the caller passed (NOT the vendor-normalized
+    codes) so the calendar can be matched against optopsy's stock /
+    options DataFrames, which use bare tickers like ``"SPY"``. Missing
     cache files are silently skipped (the symbol is omitted from the
-    result). The cache is keyed on vendor-native codes (e.g. ``AAPL.US``);
-    we use :meth:`EodhdEarningsProvider.normalize_symbol` to canonicalize
-    bare tickers before reading.
+    result).
 
     Args:
         symbols: Bare or vendor-native tickers (e.g. ``["SPY", "AAPL"]``).
@@ -67,7 +68,10 @@ def load_earnings_calendar(
             dates = dates[dates <= cutoff]
         if len(dates) == 0:
             continue
-        calendar[code] = list(dates)
+        # Key the calendar on the user-supplied symbol so it matches
+        # optopsy's stock / options DataFrames (which are keyed on
+        # bare tickers like "SPY", not the vendor-native "SPY.US").
+        calendar[sym] = list(dates)
     return calendar
 
 

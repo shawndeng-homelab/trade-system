@@ -6,22 +6,24 @@ raw responses into a list of :class:`EarningsEvent` objects.
 
 Conventions
 -----------
-- ``report_date`` is a tz-aware ``datetime`` (UTC) so BMO/AMC timing is
-  preserved. The ``session`` field carries the BMO/AMC/intraday label
-  derived from US/Eastern clock time.
+- ``report_date`` is a tz-aware ``datetime`` at UTC midnight; the
+  EODHD feed only gives a calendar date (no wire timestamp), so
+  ``session`` is a coarse BMO/AMC/unknown label carried from the vendor.
 - The vendor-native identifier (``code`` like ``"AAPL.US"``) is preserved
   alongside the bare ticker (``symbol`` like ``"AAPL"``) so consumers
   can join on either.
 - All monetary fields are nullable: small-cap names and non-US issuers
   frequently omit estimates or actuals.
+- ``eps_surprise`` is ``actual_eps - estimate_eps``; ``eps_surprise_pct``
+  is the surprise as a decimal fraction (``0.05 = 5%``).
 """
 
+import contextlib
 from datetime import UTC
+from datetime import date as date_cls
 from datetime import datetime
-from datetime import time
 from typing import Any
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 from pydantic import BaseModel
@@ -29,11 +31,7 @@ from pydantic import ConfigDict
 from pydantic import model_validator
 
 
-NYSE = ZoneInfo("America/New_York")
-_BMO_CUTOFF = time(9, 30)
-_AMC_CUTOFF = time(16, 0)
-
-Session = Literal["bmo", "amc", "intraday", "unknown"]
+Session = Literal["bmo", "amc", "unknown"]
 Source = Literal["eodhd"]
 
 
@@ -47,21 +45,16 @@ class EarningsEvent(BaseModel):
     Attributes:
         code: Vendor-native identifier with exchange suffix (e.g. ``AAPL.US``).
         symbol: Bare ticker (e.g. ``AAPL``). Derived from ``code`` if absent.
-        report_date: Tz-aware UTC datetime of the wire time (EODHD: sub-second precision).
-        fiscal_year: Fiscal year of the reporting period.
-        fiscal_quarter: Fiscal quarter (1..4) of the reporting period.
-        fiscal_period: Canonical ``"YYYYQN"`` string, ``None`` if year/quarter unknown.
-        session: BMO/AMC/intraday/unknown, derived from ``report_date`` in US/Eastern.
-        before_market_open: Vendor-provided flag (US names only; ``None`` otherwise).
-        after_market_close: Vendor-provided flag (US names only; ``None`` otherwise).
+        report_date: Tz-aware UTC datetime at midnight (the announcement date).
+        fiscal_period_end: Fiscal-period end date reported by the vendor
+            (e.g. ``2023-12-31`` for Q4 2023). ``None`` if not provided.
+        session: Coarse timing label: ``bmo`` (before market open),
+            ``amc`` (after market close), or ``unknown`` if vendor is silent.
         estimate_eps: Pre-announcement consensus EPS estimate.
         actual_eps: Reported EPS.
-        eps_surprise: ``actual_eps - estimate_eps``; ``None`` if either side missing.
-        estimate_revenue: Pre-announcement consensus revenue estimate.
-        actual_revenue: Reported revenue.
-        revenue_surprise: ``actual_revenue - estimate_revenue``; ``None`` if either side missing.
+        eps_surprise: ``actual_eps - estimate_eps``; ``None`` if either is missing.
+        eps_surprise_pct: Surprise as a decimal fraction (``0.05 = 5%``).
         currency: Reporting currency code (e.g. ``USD``).
-        period: Vendor label (e.g. ``Q1``, ``FY``, ``TTM``).
         source: Provenance tag.
     """
 
@@ -73,22 +66,15 @@ class EarningsEvent(BaseModel):
 
     # ── When ───────────────────────────────────────────────────────────────
     report_date: datetime
-    fiscal_year: int | None = None
-    fiscal_quarter: int | None = None
-    fiscal_period: str | None = None
+    fiscal_period_end: date_cls | None = None
     session: Session = "unknown"
-    before_market_open: bool | None = None
-    after_market_close: bool | None = None
 
     # ── Estimates vs actuals ───────────────────────────────────────────────
     estimate_eps: float | None = None
     actual_eps: float | None = None
     eps_surprise: float | None = None
-    estimate_revenue: float | None = None
-    actual_revenue: float | None = None
-    revenue_surprise: float | None = None
+    eps_surprise_pct: float | None = None
     currency: str | None = None
-    period: str | None = None
 
     # ── Provenance ─────────────────────────────────────────────────────────
     source: Source = "eodhd"
@@ -96,7 +82,7 @@ class EarningsEvent(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _derive_fields(cls, data: Any) -> Any:
-        """Derive ``symbol``, ``session``, ``fiscal_period`` and surprise fields."""
+        """Derive ``symbol``, normalize ``report_date``, compute surprises."""
         if not isinstance(data, dict):
             return data
 
@@ -104,47 +90,69 @@ class EarningsEvent(BaseModel):
         if "code" in data and "symbol" not in data:
             data["symbol"] = str(data["code"]).split(".", 1)[0]
 
-        # Derive fiscal_period from year + quarter.
-        if "fiscal_period" not in data and data.get("fiscal_year") and data.get("fiscal_quarter"):
-            data["fiscal_period"] = f"{int(data['fiscal_year'])}Q{int(data['fiscal_quarter'])}"
-
-        # Parse report_date if it's a string.
+        # Normalize report_date to a tz-aware datetime.
         rd = data.get("report_date")
         if isinstance(rd, str):
-            data["report_date"] = _parse_iso(rd)
-        if isinstance(rd, datetime) and rd.tzinfo is None:
-            data["report_date"] = rd.replace(tzinfo=UTC)
+            data["report_date"] = _parse_date(rd)
+        elif isinstance(rd, datetime) and rd.tzinfo is None:
+            data["report_date"] = rd.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
 
-        # Derive session from report_date in US/Eastern.
-        rd_parsed = data.get("report_date")
-        if isinstance(rd_parsed, datetime) and rd_parsed.tzinfo is not None:
-            local = rd_parsed.astimezone(NYSE).time()
-            if local < _BMO_CUTOFF:
+        # Normalize fiscal_period_end.
+        fpe = data.get("fiscal_period_end")
+        if isinstance(fpe, str):
+            try:
+                data["fiscal_period_end"] = date_cls.fromisoformat(fpe)
+            except ValueError:
+                data["fiscal_period_end"] = None
+
+        # Derive session from before_after_market label.
+        bam = data.get("before_after_market") or data.get("session")
+        if isinstance(bam, str):
+            normalized = bam.strip().lower().replace(" ", "")
+            if normalized in {"beforemarket", "bmo", "premarket"}:
                 data["session"] = "bmo"
-            elif local >= _AMC_CUTOFF:
+            elif normalized in {"aftermarket", "amc", "postmarket"}:
                 data["session"] = "amc"
             else:
-                data["session"] = "intraday"
+                data["session"] = "unknown"
 
-        # Compute surprises.
+        # Recompute eps_surprise from actual - estimate (EODHD provides
+        # these but we re-derive to be safe across vendors).
         data["eps_surprise"] = _safe_subtract(data.get("actual_eps"), data.get("estimate_eps"))
-        data["revenue_surprise"] = _safe_subtract(data.get("actual_revenue"), data.get("estimate_revenue"))
+
+        # Map EODHD's "percent" field (e.g. 3.3175) to a decimal fraction
+        # (0.033175). EODHD sends percent as already-percent; we normalize
+        # to fraction so consumers can multiply by 100 for display.
+        # ``eps_surprise_pct`` is only meaningful when both estimate and
+        # actual are present; otherwise drop it.
+        has_both_sides = data.get("actual_eps") is not None and data.get("estimate_eps") is not None
+        if has_both_sides:
+            pct = data.get("eps_surprise_pct")
+            if pct is None and "percent" in data and data["percent"] is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    data["eps_surprise_pct"] = float(data["percent"]) / 100.0
+            elif pct is not None:
+                # Caller passed eps_surprise_pct directly; assume already a fraction.
+                data["eps_surprise_pct"] = float(pct)
+        else:
+            data["eps_surprise_pct"] = None
 
         return data
 
 
-def _parse_iso(s: str) -> datetime:
-    """Parse an ISO 8601 string into a tz-aware datetime.
-
-    Tolerates ``Z`` suffix (Python <3.11) and a missing timezone (assumes UTC).
-    """
+def _parse_date(s: str) -> datetime:
+    """Parse a YYYY-MM-DD string into a tz-aware UTC midnight datetime."""
     s = s.strip()
     if s.endswith("Z"):
         s = s[:-1] + "+00:00"
-    dt = datetime.fromisoformat(s)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt
+    if "T" in s:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt
+    # Pure date.
+    d = date_cls.fromisoformat(s)
+    return datetime(d.year, d.month, d.day, tzinfo=UTC)
 
 
 def _safe_subtract(actual: float | None, estimate: float | None) -> float | None:
@@ -172,43 +180,34 @@ class EarningsCalendar(BaseModel):
 
         Columns (in order):
             ``code``, ``symbol``, ``report_date``, ``report_date_utc``,
-            ``fiscal_year``, ``fiscal_quarter``, ``fiscal_period``,
-            ``session``, ``before_market_open``, ``after_market_close``,
+            ``fiscal_period_end``, ``session``,
             ``estimate_eps``, ``actual_eps``, ``eps_surprise``,
-            ``estimate_revenue``, ``actual_revenue``, ``revenue_surprise``,
-            ``currency``, ``period``, ``source``.
+            ``eps_surprise_pct``, ``currency``, ``source``.
 
         ``report_date`` is a tz-naive ``datetime`` at UTC midnight (the
         canonical join key for optopsy's signal filter). ``report_date_utc``
-        is the full tz-aware datetime of the wire time.
+        is the same value as a tz-aware datetime.
         """
         if not self.events:
             return _empty_calendar_df()
 
         rows = []
         for ev in self.events:
-            utc = ev.report_date
-            midnight_utc = utc.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            rd_utc = ev.report_date
+            midnight_naive = rd_utc.replace(tzinfo=None) if rd_utc.tzinfo else rd_utc
             rows.append(
                 {
                     "code": ev.code,
                     "symbol": ev.symbol,
-                    "report_date": midnight_utc,
-                    "report_date_utc": utc,
-                    "fiscal_year": ev.fiscal_year,
-                    "fiscal_quarter": ev.fiscal_quarter,
-                    "fiscal_period": ev.fiscal_period,
+                    "report_date": midnight_naive,
+                    "report_date_utc": rd_utc,
+                    "fiscal_period_end": ev.fiscal_period_end,
                     "session": ev.session,
-                    "before_market_open": ev.before_market_open,
-                    "after_market_close": ev.after_market_close,
                     "estimate_eps": ev.estimate_eps,
                     "actual_eps": ev.actual_eps,
                     "eps_surprise": ev.eps_surprise,
-                    "estimate_revenue": ev.estimate_revenue,
-                    "actual_revenue": ev.actual_revenue,
-                    "revenue_surprise": ev.revenue_surprise,
+                    "eps_surprise_pct": ev.eps_surprise_pct,
                     "currency": ev.currency,
-                    "period": ev.period,
                     "source": ev.source,
                 }
             )
@@ -223,20 +222,13 @@ def _empty_calendar_df() -> pd.DataFrame:
             "symbol",
             "report_date",
             "report_date_utc",
-            "fiscal_year",
-            "fiscal_quarter",
-            "fiscal_period",
+            "fiscal_period_end",
             "session",
-            "before_market_open",
-            "after_market_close",
             "estimate_eps",
             "actual_eps",
             "eps_surprise",
-            "estimate_revenue",
-            "actual_revenue",
-            "revenue_surprise",
+            "eps_surprise_pct",
             "currency",
-            "period",
             "source",
         ]
     )

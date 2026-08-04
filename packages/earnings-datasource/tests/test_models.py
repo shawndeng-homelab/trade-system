@@ -1,6 +1,7 @@
 """Tests for the Pydantic models in earnings_datasource.models."""
 
 from datetime import UTC
+from datetime import date as date_cls
 from datetime import datetime
 
 import pandas as pd
@@ -11,39 +12,30 @@ from earnings_datasource.models import EarningsProviderError
 from pydantic import ValidationError
 
 
+# ── EarningsEvent construction ────────────────────────────────────────────
+
+
 def test_minimal_event_required_fields_only() -> None:
     """Only ``code`` and ``report_date`` are required."""
-    ev = EarningsEvent(
-        code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-    )
+    ev = EarningsEvent(code="AAPL.US", report_date="2024-02-01")  # type: ignore[arg-type]
     assert ev.code == "AAPL.US"
     assert ev.symbol == "AAPL"  # derived
-    assert ev.session == "amc"  # 17:00 ET is AMC
+    assert ev.source == "eodhd"
 
 
 def test_event_frozen() -> None:
     """Assignment to a frozen model raises ValidationError."""
-    ev = EarningsEvent(
-        code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-    )
+    ev = EarningsEvent(code="AAPL.US", report_date=datetime(2024, 2, 1, tzinfo=UTC))
     with pytest.raises(ValidationError):
         ev.code = "MSFT.US"  # type: ignore[misc]
 
 
 def test_event_symbol_derived_from_code() -> None:
     """``symbol`` is split off the first ``.`` of ``code``."""
-    ev = EarningsEvent(
-        code="BMW.XETRA",
-        report_date=datetime(2024, 8, 1, 12, 0, tzinfo=UTC),
-    )
+    ev = EarningsEvent(code="BMW.XETRA", report_date=datetime(2024, 2, 1, tzinfo=UTC))
     assert ev.symbol == "BMW"
 
-    ev2 = EarningsEvent(
-        code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 12, 0, tzinfo=UTC),
-    )
+    ev2 = EarningsEvent(code="AAPL.US", report_date=datetime(2024, 2, 1, tzinfo=UTC))
     assert ev2.symbol == "AAPL"
 
 
@@ -52,43 +44,66 @@ def test_event_explicit_symbol_wins() -> None:
     ev = EarningsEvent(
         code="BRK.B.US",
         symbol="BRK-B",
-        report_date=datetime(2024, 8, 1, 12, 0, tzinfo=UTC),
+        report_date=datetime(2024, 2, 1, tzinfo=UTC),
     )
     assert ev.symbol == "BRK-B"
 
 
-def test_session_bmo() -> None:
-    """Pre-open wire time -> ``bmo``."""
+# ── Session derivation from before_after_market ───────────────────────────
+
+
+def test_session_bmo_from_beforemarket() -> None:
+    """``BeforeMarket`` label -> ``bmo`` session."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 11, 0, tzinfo=UTC),  # 07:00 ET
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        before_after_market="BeforeMarket",
     )
     assert ev.session == "bmo"
 
 
-def test_session_amc() -> None:
-    """Post-close wire time -> ``amc``."""
+def test_session_amc_from_aftermarket() -> None:
+    """``AfterMarket`` label -> ``amc`` session."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),  # 17:00 ET
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        before_after_market="AfterMarket",
     )
     assert ev.session == "amc"
 
 
-def test_session_intraday() -> None:
-    """Mid-day wire time -> ``intraday``."""
-    ev = EarningsEvent(
-        code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 15, 0, tzinfo=UTC),  # 11:00 ET
-    )
-    assert ev.session == "intraday"
+def test_session_unknown_when_label_missing() -> None:
+    """No ``before_after_market`` -> ``unknown`` session."""
+    ev = EarningsEvent(code="AAPL.US", report_date="2024-02-01")  # type: ignore[arg-type]
+    assert ev.session == "unknown"
+
+
+def test_session_legacy_aliases() -> None:
+    """``bmo`` / ``amc`` and ``premarket`` / ``postmarket`` aliases are accepted."""
+    for label, expected in [
+        ("bmo", "bmo"),
+        ("amc", "amc"),
+        ("premarket", "bmo"),
+        ("postmarket", "amc"),
+        ("BMO", "bmo"),  # case-insensitive
+        (" AfterMarket ", "amc"),  # whitespace trimmed
+    ]:
+        ev = EarningsEvent(
+            code="AAPL.US",
+            report_date="2024-02-01",  # type: ignore[arg-type]
+            before_after_market=label,
+        )
+        assert ev.session == expected, f"label={label!r} -> {ev.session}"
+
+
+# ── EPS surprise + percent ────────────────────────────────────────────────
 
 
 def test_eps_surprise_computed() -> None:
     """``actual_eps - estimate_eps`` is auto-derived."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
+        report_date="2024-02-01",  # type: ignore[arg-type]
         estimate_eps=1.0,
         actual_eps=1.2,
     )
@@ -99,57 +114,83 @@ def test_eps_surprise_none_when_missing() -> None:
     """Missing actual or estimate -> ``eps_surprise`` is ``None``."""
     a = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
+        report_date="2024-02-01",  # type: ignore[arg-type]
         estimate_eps=1.0,
     )
     assert a.eps_surprise is None
     b = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
+        report_date="2024-02-01",  # type: ignore[arg-type]
         actual_eps=1.2,
     )
     assert b.eps_surprise is None
 
 
-def test_revenue_surprise_computed() -> None:
-    """``actual_revenue - estimate_revenue`` is auto-derived."""
+def test_eps_surprise_pct_from_percent() -> None:
+    """EODHD ``percent=3.3175`` -> ``eps_surprise_pct=0.033175`` (fraction)."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-        estimate_revenue=100.0,
-        actual_revenue=120.5,
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        estimate_eps=2.11,
+        actual_eps=2.18,
+        percent=3.3175,
     )
-    assert ev.revenue_surprise == pytest.approx(20.5)
+    assert ev.eps_surprise_pct == pytest.approx(0.033175)
 
 
-def test_fiscal_period_derived() -> None:
-    """``fiscal_year`` + ``fiscal_quarter`` produce ``"YYYYQN"`` string."""
+def test_eps_surprise_pct_explicit_fraction() -> None:
+    """Passing ``eps_surprise_pct`` directly is honored as a fraction."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-        fiscal_year=2024,
-        fiscal_quarter=3,
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        estimate_eps=1.0,
+        actual_eps=1.05,
+        eps_surprise_pct=0.05,
     )
-    assert ev.fiscal_period == "2024Q3"
+    assert ev.eps_surprise_pct == pytest.approx(0.05)
 
 
-def test_fiscal_period_none_when_year_missing() -> None:
-    """Missing fiscal year leaves ``fiscal_period`` as ``None``."""
+def test_eps_surprise_pct_none_when_no_estimate() -> None:
+    """No estimate -> no percent (percent is meaningless without both sides)."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-        fiscal_quarter=3,
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        actual_eps=1.2,
+        percent=10.0,
     )
-    assert ev.fiscal_period is None
+    assert ev.eps_surprise_pct is None
+
+
+# ── fiscal_period_end ────────────────────────────────────────────────────
+
+
+def test_fiscal_period_end_parsed_from_string() -> None:
+    """``fiscal_period_end`` accepts a YYYY-MM-DD string."""
+    ev = EarningsEvent(
+        code="AAPL.US",
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        fiscal_period_end="2023-12-31",  # type: ignore[arg-type]
+    )
+    assert ev.fiscal_period_end == date_cls(2023, 12, 31)
+
+
+def test_fiscal_period_end_optional() -> None:
+    """``fiscal_period_end`` is optional; defaults to ``None``."""
+    ev = EarningsEvent(code="AAPL.US", report_date="2024-02-01")  # type: ignore[arg-type]
+    assert ev.fiscal_period_end is None
+
+
+# ── Calendar / DataFrame ──────────────────────────────────────────────────
 
 
 def test_calendar_to_dataframe_columns() -> None:
     """DataFrame has the canonical column order."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 0, tzinfo=UTC),
-        estimate_eps=1.0,
-        actual_eps=1.2,
+        report_date="2024-02-01",  # type: ignore[arg-type]
+        estimate_eps=2.11,
+        actual_eps=2.18,
+        before_after_market="AfterMarket",
     )
     df = EarningsCalendar(events=[ev]).to_dataframe()
     assert list(df.columns) == [
@@ -157,20 +198,13 @@ def test_calendar_to_dataframe_columns() -> None:
         "symbol",
         "report_date",
         "report_date_utc",
-        "fiscal_year",
-        "fiscal_quarter",
-        "fiscal_period",
+        "fiscal_period_end",
         "session",
-        "before_market_open",
-        "after_market_close",
         "estimate_eps",
         "actual_eps",
         "eps_surprise",
-        "estimate_revenue",
-        "actual_revenue",
-        "revenue_surprise",
+        "eps_surprise_pct",
         "currency",
-        "period",
         "source",
     ]
 
@@ -184,21 +218,22 @@ def test_calendar_to_dataframe_empty() -> None:
     assert "report_date" in df.columns
 
 
-def test_calendar_to_dataframe_report_date_normalized() -> None:
-    """``report_date`` is tz-naive midnight UTC; ``report_date_utc`` is full."""
+def test_calendar_to_dataframe_report_date_naive() -> None:
+    """``report_date`` is tz-naive midnight UTC; ``report_date_utc`` is tz-aware."""
     ev = EarningsEvent(
         code="AAPL.US",
-        report_date=datetime(2024, 8, 1, 21, 30, 45, tzinfo=UTC),
+        report_date="2024-02-01",  # type: ignore[arg-type]
     )
     df = EarningsCalendar(events=[ev]).to_dataframe()
-    # ``report_date`` is tz-naive at UTC midnight.
     rd = df["report_date"].iloc[0]
     assert pd.isna(rd.tzinfo)
-    assert rd.hour == 0 and rd.minute == 0 and rd.second == 0
-    # ``report_date_utc`` is tz-aware with the full time.
+    assert rd.year == 2024 and rd.month == 2 and rd.day == 1
     rd_utc = df["report_date_utc"].iloc[0]
     assert rd_utc.tzinfo is not None
-    assert rd_utc.hour == 21 and rd_utc.minute == 30
+    assert rd_utc.year == 2024 and rd_utc.month == 2 and rd_utc.day == 1
+
+
+# ── Error type ────────────────────────────────────────────────────────────
 
 
 def test_provider_error_is_exception() -> None:
@@ -206,23 +241,3 @@ def test_provider_error_is_exception() -> None:
     assert issubclass(EarningsProviderError, Exception)
     with pytest.raises(EarningsProviderError):
         raise EarningsProviderError("boom")
-
-
-def test_report_date_iso_string_parsed() -> None:
-    """``report_date`` accepts an ISO 8601 string with ``+00:00`` offset."""
-    ev = EarningsEvent(
-        code="AAPL.US",
-        report_date="2024-08-01T21:00:00+00:00",  # type: ignore[arg-type]
-    )
-    assert ev.report_date.tzinfo is not None
-    assert ev.report_date.hour == 21
-
-
-def test_report_date_iso_string_with_z_suffix() -> None:
-    """``report_date`` accepts ISO 8601 strings with the ``Z`` suffix."""
-    ev = EarningsEvent(
-        code="AAPL.US",
-        report_date="2024-08-01T21:00:00Z",  # type: ignore[arg-type]
-    )
-    assert ev.report_date.tzinfo is not None
-    assert ev.report_date.hour == 21

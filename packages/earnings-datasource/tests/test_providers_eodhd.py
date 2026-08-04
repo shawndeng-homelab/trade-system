@@ -5,16 +5,22 @@ JSON responses, so no real EODHD requests are issued during tests.
 """
 
 import json
+from datetime import UTC
 from datetime import date
+from datetime import datetime
 from datetime import timedelta
 from itertools import pairwise
+from pathlib import Path
 from typing import Any
 
 import pytest
 import requests
+from earnings_datasource import EarningsCalendar
 from earnings_datasource import EodhdEarningsProvider
+from earnings_datasource.models import EarningsEvent
 from earnings_datasource.models import EarningsProviderError
 from earnings_datasource.providers import eodhd as eodhd_mod
+from earnings_datasource.providers.store import write_earnings
 
 
 # ── Mock session ──────────────────────────────────────────────────────────
@@ -87,97 +93,107 @@ def test_cache_key_matches_normalize(monkeypatch_api_key: None) -> None:
     assert p.cache_key("AAPL") == p.normalize_symbol("AAPL")
 
 
-# ── Tests: collapse ──────────────────────────────────────────────────────
+# ── Tests: normalize ────────────────────────────────────────────────────
 
 
-def test_collapse_two_rows_into_one_event(monkeypatch_api_key: None) -> None:
-    """EODHD's eps+revenue pair collapses into one EarningsEvent."""
-    raw = [
-        {
-            "code": "AAPL.US",
-            "type": "eps",
-            "date": "2024-08-01",
-            "report_date": "2024-08-01T21:00:00+00:00",
-            "before_market_open": None,
-            "after_market_close": True,
-            "estimate": 1.0,
-            "actual": 1.2,
-            "currency": "USD",
-            "period": "Q3",
-            "fiscal_year": 2024,
-            "fiscal_quarter": 3,
-        },
-        {
-            "code": "AAPL.US",
-            "type": "revenue",
-            "date": "2024-08-01",
-            "report_date": "2024-08-01T21:00:00+00:00",
-            "before_market_open": None,
-            "after_market_close": True,
-            "estimate": 100.0,
-            "actual": 120.5,
-            "currency": "USD",
-            "period": "Q3",
-            "fiscal_year": 2024,
-            "fiscal_quarter": 3,
-        },
-    ]
-    events = eodhd_mod._collapse(raw)
+def test_normalize_eodhd_paid_plan_row() -> None:
+    """A real EODHD paid-plan row normalizes to an EarningsEvent."""
+    raw = {
+        "code": "AAPL.US",
+        "report_date": "2024-02-01",
+        "date": "2023-12-31",
+        "before_after_market": "AfterMarket",
+        "currency": "USD",
+        "actual": 2.18,
+        "estimate": 2.11,
+        "difference": 0.07,
+        "percent": 3.3175,
+    }
+    events = eodhd_mod._normalize_rows([raw])
     assert len(events) == 1
     ev = events[0]
     assert ev.code == "AAPL.US"
-    assert ev.estimate_eps == 1.0
-    assert ev.actual_eps == 1.2
-    assert ev.eps_surprise == pytest.approx(0.2)
-    assert ev.estimate_revenue == 100.0
-    assert ev.actual_revenue == 120.5
-    assert ev.revenue_surprise == pytest.approx(20.5)
-    assert ev.fiscal_year == 2024
-    assert ev.fiscal_quarter == 3
-    assert ev.fiscal_period == "2024Q3"
-    assert ev.after_market_close is True
+    assert ev.symbol == "AAPL"
+    assert ev.session == "amc"
+    assert ev.actual_eps == 2.18
+    assert ev.estimate_eps == 2.11
+    assert ev.eps_surprise == pytest.approx(0.07)
+    assert ev.eps_surprise_pct == pytest.approx(0.033175)
+    assert ev.fiscal_period_end == date(2023, 12, 31)
+    assert ev.currency == "USD"
 
 
-def test_collapse_skips_incomplete_rows() -> None:
+def test_normalize_skips_incomplete_rows() -> None:
     """Rows missing both ``code`` and ``report_date`` are skipped."""
-    raw = [
-        {"code": "AAPL.US", "report_date": "2024-08-01T21:00:00+00:00", "type": "eps"},
-        {"code": None, "report_date": "2024-08-01T21:00:00+00:00", "type": "eps"},
-        {"code": "MSFT.US", "report_date": None, "type": "eps"},
+    rows = [
+        {"code": "AAPL.US", "report_date": "2024-02-01", "actual": 1.0},
+        {"code": None, "report_date": "2024-02-01"},
+        {"code": "MSFT.US", "report_date": None},
     ]
-    events = eodhd_mod._collapse(raw)
+    events = eodhd_mod._normalize_rows(rows)
     assert len(events) == 1
     assert events[0].code == "AAPL.US"
+
+
+def test_extract_earnings_list_from_dict() -> None:
+    """Paid-plan payload wraps the array in ``{"earnings": [...]}``."""
+    payload = {
+        "type": "Earnings",
+        "from": "2024-01-01",
+        "to": "2024-01-30",
+        "earnings": [{"code": "AAPL.US", "report_date": "2024-02-01"}],
+    }
+    assert eodhd_mod._extract_earnings_list(payload) == [{"code": "AAPL.US", "report_date": "2024-02-01"}]
+
+
+def test_extract_earnings_list_from_bare_list() -> None:
+    """A bare list payload is returned as-is (defensive)."""
+    payload = [{"code": "AAPL.US", "report_date": "2024-02-01"}]
+    assert eodhd_mod._extract_earnings_list(payload) == payload
+
+
+def test_extract_earnings_list_error_payload_raises() -> None:
+    """An error payload without an ``earnings`` list raises."""
+    with pytest.raises(EarningsProviderError, match="error payload"):
+        eodhd_mod._extract_earnings_list({"error": "rate limited"})
+
+
+def test_extract_earnings_list_unexpected_shape_raises() -> None:
+    """A scalar payload raises ``EarningsProviderError``."""
+    with pytest.raises(EarningsProviderError, match="unexpected"):
+        eodhd_mod._extract_earnings_list("not a list or dict")
 
 
 # ── Tests: fetch ─────────────────────────────────────────────────────────
 
 
-def test_fetch_collapses_eps_and_revenue(monkeypatch_api_key: None) -> None:
-    """End-to-end: two-row response collapses to one event."""
-    raw = [
-        {
-            "code": "AAPL.US",
-            "type": "eps",
-            "report_date": "2024-02-01T21:30:00+00:00",
-            "estimate": 2.0,
-            "actual": 2.4,
-        },
-        {
-            "code": "AAPL.US",
-            "type": "revenue",
-            "report_date": "2024-02-01T21:30:00+00:00",
-            "estimate": 100.0,
-            "actual": 120.0,
-        },
-    ]
-    session = _MockSession([_MockResponse(200, raw)])
+def test_fetch_wrapped_response(monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-to-end: a wrapped ``{"earnings": [...]}`` response is parsed correctly."""
+    monkeypatch.setattr(eodhd_mod, "_MIN_INTERVAL_SEC", 0.0)
+    raw_payload = {
+        "type": "Earnings",
+        "from": "2024-02-01",
+        "to": "2024-02-28",
+        "earnings": [
+            {
+                "code": "AAPL.US",
+                "report_date": "2024-02-01",
+                "date": "2023-12-31",
+                "before_after_market": "AfterMarket",
+                "currency": "USD",
+                "actual": 2.18,
+                "estimate": 2.11,
+                "percent": 3.3175,
+            }
+        ],
+    }
+    session = _MockSession([_MockResponse(200, raw_payload)])
     p = EodhdEarningsProvider(session=session)
     events = p.fetch(["AAPL"], date(2024, 2, 1), date(2024, 2, 28))
     assert len(events) == 1
     assert events[0].code == "AAPL.US"
-    assert events[0].actual_eps == 2.4
-    assert events[0].actual_revenue == 120.0
+    assert events[0].actual_eps == 2.18
+    assert events[0].session == "amc"
 
 
 def test_fetch_sends_api_token(monkeypatch_api_key: None) -> None:
@@ -370,6 +386,154 @@ def test_fetch_single_day(monkeypatch_api_key: None, monkeypatch: pytest.MonkeyP
     assert len(session.calls) == 1
     assert session.calls[0]["params"]["from"] == "2024-02-15"
     assert session.calls[0]["params"]["to"] == "2024-02-15"
+
+
+# ── Tests: incremental_fetch ─────────────────────────────────────────────
+
+
+def _aapl_row(report_date: str, **overrides: Any) -> dict[str, Any]:
+    """Build a single AAPL earnings row with sensible defaults."""
+    base = {
+        "code": "AAPL.US",
+        "report_date": report_date,
+        "date": report_date,
+        "before_after_market": "AfterMarket",
+        "currency": "USD",
+        "actual": 1.0,
+        "estimate": 0.9,
+        "difference": 0.1,
+        "percent": 11.11,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_incremental_fetch_no_cache_uses_one_year_backfill(
+    monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
+) -> None:
+    """With no cache, ``incremental_fetch`` defaults to a 1-year window."""
+    monkeypatch.setattr(eodhd_mod, "_MIN_INTERVAL_SEC", 0.0)
+    today = date(2026, 1, 15)
+    expected_start = today - timedelta(days=365)
+    payload = {"type": "Earnings", "earnings": [_aapl_row("2025-12-15")]}
+    # A 1-year window chunks into ~13 monthly HTTP calls.
+    session = _MockSession([_MockResponse(200, payload) for _ in range(13)])
+    p = EodhdEarningsProvider(session=session)
+    p.incremental_fetch(["AAPL"], end_date=today, cache_root=tmp_optopsy_dir)
+    # 13 monthly windows means 13 HTTP calls.
+    assert len(session.calls) == 13
+    # The first window's from should be the backfill start.
+    # of it — month windows chunk to ~30 days, so we just sanity-check
+    # it's not the empty default and not the end date).
+    assert session.calls[0]["params"]["from"] == expected_start.isoformat()
+
+
+def test_incremental_fetch_uses_cache_latest_minus_overlap(
+    monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
+) -> None:
+    """With a cache, ``incremental_fetch`` queries from latest - overlap_days."""
+    # Seed the cache with one event on 2024-06-30.
+    seed = EarningsCalendar(
+        events=[
+            EarningsEvent(
+                code="AAPL.US",
+                report_date=datetime(2024, 6, 30, tzinfo=UTC),
+            )
+        ]
+    ).to_dataframe()
+    write_earnings("AAPL.US", seed, root=tmp_optopsy_dir)
+
+    monkeypatch.setattr(eodhd_mod, "_MIN_INTERVAL_SEC", 0.0)
+    # Vendor returns one new row.
+    payload = {"type": "Earnings", "earnings": [_aapl_row("2024-09-30")]}
+    # 2024-06-23 to 2024-12-31 = ~7 monthly windows.
+    session = _MockSession([_MockResponse(200, payload) for _ in range(7)])
+    p = EodhdEarningsProvider(session=session)
+    p.incremental_fetch(
+        ["AAPL"],
+        end_date=date(2024, 12, 31),
+        overlap_days=7,
+        cache_root=tmp_optopsy_dir,
+    )
+    assert len(session.calls) == 7
+    # With latest=2024-06-30 and overlap_days=7, the start is 2024-06-23.
+    # The end of the *first* 30-day window is 2024-07-22 (not the user-facing
+    # 12-31, because month windows chunk into 30-day slices).
+    assert session.calls[0]["params"]["from"] == "2024-06-23"
+    assert session.calls[0]["params"]["to"] == "2024-07-22"
+
+
+def test_incremental_fetch_skips_symbols_past_end(
+    monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
+) -> None:
+    """If the latest cached row is already after ``end_date``, no HTTP call is made."""
+    # Seed the cache with a row AFTER the requested end_date.
+    seed = EarningsCalendar(
+        events=[
+            EarningsEvent(
+                code="AAPL.US",
+                report_date=datetime(2026, 6, 1, tzinfo=UTC),
+            )
+        ]
+    ).to_dataframe()
+    write_earnings("AAPL.US", seed, root=tmp_optopsy_dir)
+
+    session = _MockSession([])  # no scripted responses
+    p = EodhdEarningsProvider(session=session)
+    events = p.incremental_fetch(
+        ["AAPL"],
+        end_date=date(2026, 1, 1),
+        overlap_days=7,
+        cache_root=tmp_optopsy_dir,
+    )
+    assert events == []
+    assert session.calls == []  # no HTTP call made
+
+
+def test_incremental_fetch_handles_mixed_symbols(
+    monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
+) -> None:
+    """Some symbols have cache, some don't — both are handled correctly."""
+    # Seed AAPL with one row.
+    seed = EarningsCalendar(
+        events=[
+            EarningsEvent(
+                code="AAPL.US",
+                report_date=datetime(2024, 1, 15, tzinfo=UTC),
+            )
+        ]
+    ).to_dataframe()
+    write_earnings("AAPL.US", seed, root=tmp_optopsy_dir)
+    # MSFT has no cache.
+
+    monkeypatch.setattr(eodhd_mod, "_MIN_INTERVAL_SEC", 0.0)
+    payload = {
+        "type": "Earnings",
+        "earnings": [
+            _aapl_row("2024-04-15", code="AAPL.US"),
+            _aapl_row("2024-04-20", code="MSFT.US", actual=3.0, estimate=2.9),
+        ],
+    }
+    # AAPL: 2024-01-08 to 2024-06-30 = ~6 windows. MSFT: 2023-07-01 to 2024-06-30
+    # = ~12 windows. Over-allocate to 25 to be safe.
+    session = _MockSession([_MockResponse(200, payload) for _ in range(25)])
+    p = EodhdEarningsProvider(session=session)
+    events = p.incremental_fetch(
+        ["AAPL", "MSFT"],
+        end_date=date(2024, 6, 30),
+        overlap_days=7,
+        cache_root=tmp_optopsy_dir,
+    )
+    # Both AAPL and MSFT events should come back (callers filter/dedup).
+    assert {e.code for e in events} == {"AAPL.US", "MSFT.US"}
+    # Each symbol gets its own multi-window fetch (~7 + ~12 = 19).
+    assert len(session.calls) == 19
+    # The two symbols' first windows should start at different dates
+    # (AAPL: latest cached 2024-01-15 - 7 overlap = 2024-01-08;
+    # MSFT: no cache, so 1-year backfill from 2024-06-30 = 2023-07-01).
+    from_dates = sorted({c["params"]["from"] for c in session.calls})
+    assert "2024-01-08" in from_dates
+    assert "2023-07-01" in from_dates
 
 
 # ── Sanity: timedelta arithmetic used by month windows ──────────────────

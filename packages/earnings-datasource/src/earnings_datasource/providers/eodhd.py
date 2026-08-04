@@ -3,26 +3,45 @@
 Talks to ``https://eodhd.com/api/calendar/earnings`` and normalizes the
 response into :class:`EarningsEvent` records.
 
-Caveats specific to EODHD's calendar endpoint
----------------------------------------------
-- One physical announcement yields two rows (one ``type="eps"``, one
-  ``type="revenue"``). We collapse them on ``(code, report_date)``.
-- The endpoint ignores ``from``/``to`` when ``symbols`` is supplied
-  (it returns the next 4-12 weeks of forward calendar plus the trailing
-  history). For multi-year backtests we therefore **don't pass** symbols
-  and instead slice the calendar by date.
-- We always paginate by 30-day windows to keep HTTP responses small and
-  predictable (the API does not publish a hard limit, but a ~30-day
-  window has been observed to be safe).
+Response shape (Corporate Events Calendar & News API plan)
+----------------------------------------------------------
+The endpoint returns a wrapped object::
+
+    {
+      "type": "Earnings",
+      "description": "...",
+      "from": "YYYY-MM-DD",
+      "to": "YYYY-MM-DD",
+      "earnings": [
+        {
+          "code": "AAPL.US",
+          "report_date": "2024-02-01",        # announcement date
+          "date": "2023-12-31",               # fiscal-period end
+          "before_after_market": "AfterMarket",
+          "currency": "USD",
+          "actual": 2.18,
+          "estimate": 2.11,
+          "difference": 0.07,
+          "percent": 3.3175                   # surprise as percent (not fraction)
+        },
+        ...
+      ]
+    }
+
+Each row is a single announcement (no eps/revenue split in this plan —
+revenue data, if needed, comes from the separate ``calendar/trends``
+endpoint).
 """
 
 import logging
 import os
 import re
 import time as _time
+from collections.abc import Callable
 from collections.abc import Sequence
 from datetime import date
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from typing import ClassVar
 
@@ -31,6 +50,7 @@ import requests
 from earnings_datasource.models import EarningsEvent
 from earnings_datasource.models import EarningsProviderError
 from earnings_datasource.providers.base import BaseEarningsProvider
+from earnings_datasource.providers.store import latest_report_date
 
 
 logger = logging.getLogger(__name__)
@@ -102,11 +122,21 @@ class EodhdEarningsProvider(BaseEarningsProvider):
         symbols: Sequence[str],
         start_date: date,
         end_date: date,
+        *,
+        on_window: Callable[[int, int, date, date], None] | None = None,
     ) -> list[EarningsEvent]:
         """Fetch earnings events for *symbols* in ``[start_date, end_date]``.
 
         We always query by date window (not by ``symbols=``) so we can paginate
         predictably across multi-year backtests; symbols are filtered client-side.
+
+        Args:
+            symbols: Tickers to fetch.
+            start_date: Inclusive start of the announcement-date window.
+            end_date: Inclusive end of the announcement-date window.
+            on_window: Optional ``(idx, total, window_from, window_to) -> None``
+                callback invoked before each HTTP call, intended for progress
+                reporting. ``idx`` is 1-based, ``total`` is the total window count.
         """
         if start_date > end_date:
             msg = f"start_date ({start_date}) is after end_date ({end_date})"
@@ -116,25 +146,83 @@ class EodhdEarningsProvider(BaseEarningsProvider):
         canonical_set = set(canonical)
         all_events: list[EarningsEvent] = []
 
-        for window_from, window_to in _month_windows(start_date, end_date):
+        windows = _month_windows(start_date, end_date)
+        total = len(windows)
+        for idx, (window_from, window_to) in enumerate(windows, start=1):
             params = {
                 "from": window_from.isoformat(),
                 "to": window_to.isoformat(),
                 "fmt": "json",
             }
             rows = self._fetch_window(params)
-            for ev in _collapse(rows):
+            for ev in _normalize_rows(rows):
                 if ev.code in canonical_set:
                     all_events.append(ev)
+            if on_window is not None:
+                # Invoke the callback *after* the window completes so the
+                # caller can advance a progress bar to ``idx`` (this window
+                # is now done).
+                on_window(idx, total, window_from, window_to)
 
         # Sort by report_date ascending (stable across calls).
+        all_events.sort(key=lambda e: (e.code, e.report_date))
+        return all_events
+
+    def incremental_fetch(
+        self,
+        symbols: Sequence[str],
+        *,
+        end_date: date | None = None,
+        overlap_days: int = 7,
+        cache_root: Path | None = None,
+        on_window: Callable[[int, int, date, date], None] | None = None,
+    ) -> list[EarningsEvent]:
+        """Fetch only the rows the local cache is missing.
+
+        For each symbol, inspect the parquet cache via
+        :func:`latest_report_date`; if there are cached rows, the
+        effective ``start_date`` is ``latest - overlap_days`` (so late
+        vendor updates within the overlap window are still picked up).
+        Symbols with no cache row fall back to a 1-year backfill.
+
+        Args:
+            symbols: Tickers to refresh.
+            end_date: Inclusive upper bound (defaults to today).
+            overlap_days: Days of overlap with the existing cache, to
+                catch late restatements / corrections.
+            cache_root: Override the data root (for tests).
+            on_window: Optional ``(idx, total, window_from, window_to) -> None``
+                callback invoked before each HTTP call across all symbols.
+
+        Returns:
+            A flat list of normalized :class:`EarningsEvent` records
+            fetched from the vendor (caller is responsible for merging
+            into the cache).
+        """
+        if end_date is None:
+            end_date = date.today()
+
+        canonical = [self.normalize_symbol(s) for s in symbols]
+        per_symbol_windows: list[tuple[str, date, date]] = []
+        for code in canonical:
+            latest = latest_report_date(code, root=cache_root)
+            start = end_date - timedelta(days=365) if latest is None else latest - timedelta(days=overlap_days)
+            if start > end_date:
+                # Cache is already past the requested end — nothing to do.
+                continue
+            per_symbol_windows.append((code, start, end_date))
+
+        all_events: list[EarningsEvent] = []
+        for code, start, end in per_symbol_windows:
+            events = self.fetch([code], start, end, on_window=on_window)
+            all_events.extend(events)
         all_events.sort(key=lambda e: (e.code, e.report_date))
         return all_events
 
     # ── HTTP layer ────────────────────────────────────────────────────────
 
     def _fetch_window(self, params: dict[str, str]) -> list[dict[str, Any]]:
-        """Issue a throttled GET with retry on 429/5xx; return the JSON list."""
+        """Issue a throttled GET with retry on 429/5xx; return the ``earnings`` list."""
         url = _BASE_URL
         last_exc: Exception | None = None
 
@@ -162,10 +250,7 @@ class EodhdEarningsProvider(BaseEarningsProvider):
                     logger.warning("EODHD returned non-JSON: %s", exc)
                     self._sleep_backoff(attempt)
                     continue
-                if not isinstance(payload, list):
-                    msg = f"unexpected EODHD payload shape: list expected, got {type(payload).__name__}"
-                    raise EarningsProviderError(msg)
-                return payload
+                return _extract_earnings_list(payload)
 
             if resp.status_code in (429, 500, 502, 503, 504):
                 last_exc = EarningsProviderError(f"EODHD HTTP {resp.status_code}: {resp.reason}")
@@ -219,59 +304,51 @@ def _month_windows(start: date, end: date) -> list[tuple[date, date]]:
     return windows
 
 
-def _collapse(raw_rows: list[dict[str, Any]]) -> list[EarningsEvent]:
-    """Collapse EODHD's two-row-per-announcement layout into one event each.
+def _extract_earnings_list(payload: Any) -> list[dict[str, Any]]:
+    """Pull the ``earnings`` list out of an EODHD response.
 
-    EODHD returns one row per ``(code, report_date, type)`` where ``type``
-    is ``"eps"`` or ``"revenue"``. The shared fields
-    (``code``, ``date``, ``report_date``, ``before_market_open``,
-    ``after_market_close``, ``currency``, ``period``, ``fiscal_year``,
-    ``fiscal_quarter``) are merged; the per-type fields (``estimate``,
-    ``actual``) populate the matching ``*_eps`` or ``*_revenue`` slots.
+    The paid-plan response is a ``{"earnings": [...], "type": ..., ...}``
+    dict. Some endpoints (or error responses) return a bare list or a
+    plain error dict; we raise on the latter.
     """
-    grouped: dict[tuple[str, str], dict[str, Any]] = {}
-    for row in raw_rows:
-        code = row.get("code")
-        report_date = row.get("report_date") or row.get("date")
-        if not code or not report_date:
-            # Skip rows that don't have enough to identify the announcement.
-            continue
-        key = (code, report_date)
-        bucket = grouped.setdefault(key, {})
-        # Shared fields — only set if not already present (rows are
-        # not guaranteed to be ordered).
-        for shared in (
-            "code",
-            "date",
-            "report_date",
-            "before_market_open",
-            "after_market_close",
-            "currency",
-            "period",
-            "fiscal_year",
-            "fiscal_quarter",
-        ):
-            if shared in row and shared not in bucket:
-                bucket[shared] = row[shared]
-        # Per-type fields.
-        row_type = row.get("type")
-        if row_type == "eps":
-            bucket["estimate_eps"] = _maybe_float(row.get("estimate"))
-            bucket["actual_eps"] = _maybe_float(row.get("actual"))
-        elif row_type == "revenue":
-            bucket["estimate_revenue"] = _maybe_float(row.get("estimate"))
-            bucket["actual_revenue"] = _maybe_float(row.get("actual"))
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        if "earnings" in payload and isinstance(payload["earnings"], list):
+            return payload["earnings"]
+        if "error" in payload or "message" in payload:
+            msg = f"EODHD returned an error payload: {payload}"
+            raise EarningsProviderError(msg)
+    msg = f"unexpected EODHD payload shape: list/dict-with-'earnings' expected, got {type(payload).__name__}"
+    raise EarningsProviderError(msg)
 
+
+def _normalize_rows(rows: list[dict[str, Any]]) -> list[EarningsEvent]:
+    """Convert raw EODHD rows into :class:`EarningsEvent` records.
+
+    Skips rows that lack both ``code`` and ``report_date``. Each row maps
+    1-to-1 to one event (no eps/revenue collapse in this plan).
+    """
     events: list[EarningsEvent] = []
-    for bucket in grouped.values():
-        # ``report_date`` is the wire time; ``date`` (if distinct) is the
-        # announcement calendar date. We prefer ``report_date`` for tz-aware
-        # precision; if only ``date`` is present, use it.
-        if "report_date" in bucket:
-            bucket["report_date"] = bucket["report_date"]
-        elif "date" in bucket:
-            bucket["report_date"] = bucket["date"]
-        events.append(EarningsEvent.model_validate(bucket))
+    for row in rows:
+        code = row.get("code")
+        report_date = row.get("report_date")
+        if not code or not report_date:
+            continue
+        # Map the vendor field names to our schema. The model_validator
+        # in ``EarningsEvent`` does the heavy lifting (parsing the date
+        # string, deriving session, computing surprise, etc.).
+        payload = {
+            "code": code,
+            "report_date": report_date,
+            "fiscal_period_end": row.get("date"),  # fiscal-period end
+            "before_after_market": row.get("before_after_market"),
+            "currency": row.get("currency"),
+            "estimate_eps": _maybe_float(row.get("estimate")),
+            "actual_eps": _maybe_float(row.get("actual")),
+            "percent": _maybe_float(row.get("percent")),
+        }
+        events.append(EarningsEvent.model_validate(payload))
     return events
 
 

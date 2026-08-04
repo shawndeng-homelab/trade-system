@@ -14,6 +14,7 @@ do **not** route through optopsy's ``get_store()`` because:
 """
 
 import os
+from datetime import date as date_cls
 from pathlib import Path
 
 import pandas as pd
@@ -101,3 +102,20 @@ def merge_earnings(
     merged = merged.reset_index(drop=True)
     write_earnings(symbol, merged, root=root)
     return merged
+
+
+def latest_report_date(symbol: str, *, root: Path | None = None) -> date_cls | None:
+    """Return the most recent ``report_date`` cached for *symbol``, or ``None``.
+
+    Used to plan incremental downloads: if the cache has rows through
+    2024-06-30, a subsequent run only needs to query the API starting
+    from 2024-07-01 (minus a small overlap to catch late vendor updates).
+    """
+    df = read_earnings(symbol, root=root)
+    if df is None or df.empty or "report_date" not in df.columns:
+        return None
+    # ``report_date`` is a tz-naive ``pd.Timestamp`` at UTC midnight.
+    ts = df["report_date"].max()
+    if pd.isna(ts):
+        return None
+    return ts.date() if hasattr(ts, "date") else ts

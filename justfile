@@ -127,7 +127,7 @@ download symbol="SPY": (download-options symbol) (download-stocks symbol)
 # Download the EODHD earnings calendar to the optopsy cache
 # (requires EODHD_API_KEY in .env; the justfile's dotenv-load surfaces it).
 download-earnings *args:
-    uv run python scripts/download_earnings_calendar.py {{args}}
+    uv run --all-packages earnings-data download {{args}}
 
 # Add a new package to the workspace (skeleton + cog.toml + sync)
 add-package name:

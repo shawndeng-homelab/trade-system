@@ -61,23 +61,41 @@ print(df.head())
 
 ## CLI
 
-A downloader script is provided for ad-hoc fetches:
+A Click-based console script is registered as `earnings-data`. It
+mirrors the layout of `optopsy-data`: a top-level group with
+`download` and `cache` subcommands.
+
+`download` is **incremental by default** — it inspects each symbol's
+local cache and only queries the API for rows newer than
+`(max cached report_date - overlap-days)`. Symbols with no cache fall
+back to a 2-year backfill (override with `--no-cache-window-days`).
+Pass `--full` to force a full re-fetch of the requested date window
+(useful when you want to refresh a stale range or pull data into a
+fresh cache).
 
 ```bash
-# Full range fetch (1 year default)
+# Show the full surface
+earnings-data --help
+
+# Default: incremental — first run pulls 1 year, later runs fill gaps
 just download-earnings --symbols AAPL,MSFT,GOOGL
 
-# Explicit date range
-just download-earnings --symbols AAPL --from 2024-01-01 --to 2024-03-31
-
-# Incremental: only fetch rows the local cache is missing
-just download-earnings --incremental --symbols AAPL,MSFT
+# Force a full re-fetch over an explicit window
+just download-earnings --full --symbols AAPL --from 2024-01-01 --to 2024-03-31
 
 # Custom cache directory (otherwise uses $OPTOPSY_DATA_DIR or ~/.optopsy)
 just download-earnings --symbols AAPL --cache-dir ./tmp/cache
 ```
 
-The script prints a Rich progress bar (or per-window lines in
+The `cache` subcommand mirrors `optopsy-data cache`:
+
+```bash
+earnings-data cache size       # per-symbol + total disk usage
+earnings-data cache clear AAPL # remove one symbol
+earnings-data cache clear --all -y  # nuke everything
+```
+
+`download` prints a Rich progress bar (or per-window lines in
 non-TTY contexts) and a final summary table of the events fetched.
 
 ## Reading cached data
@@ -112,6 +130,7 @@ announcement):
 ```
 src/earnings_datasource/
 ├── __init__.py        # public API re-exports
+├── cli.py             # Click-based earnings-data console script
 ├── models.py          # EarningsEvent + EarningsCalendar (Pydantic v2 frozen)
 ├── providers/
 │   ├── base.py        # BaseEarningsProvider ABC
@@ -135,9 +154,11 @@ strong runtime one.
    `normalize_symbol`, `cache_key`).
 2. Map your vendor's response to `EarningsEvent.model_validate(...)`.
 3. Optionally implement `incremental_fetch(...)` for cache-aware
-   refresh; the CLI's `--incremental` flag calls it via `getattr`.
-4. The script's `_PROVIDERS` dict auto-registers new sources — no
-   `optopsy.providers` plumbing required for non-`optopsy` consumers.
+   refresh; the `download` subcommand dispatches to it by default
+   (so re-running only fetches rows newer than the local cache).
+4. Add the class to `_PROVIDERS` in `cli.py` — the CLI's
+   `--source` choices auto-pick it up. No `optopsy.providers`
+   plumbing required for non-`optopsy` consumers.
 
 ## Tests
 

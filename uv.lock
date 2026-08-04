@@ -563,6 +563,7 @@ name = "earnings-datasource"
 version = "0.1.0"
 source = { editable = "packages/earnings-datasource" }
 dependencies = [
+    { name = "click" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "pydantic" },
@@ -577,6 +578,7 @@ optopsy = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8,<9" },
     { name = "optopsy", extras = ["data"], marker = "extra == 'optopsy'", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pyarrow", specifier = ">=14" },

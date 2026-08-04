@@ -174,6 +174,7 @@ class EodhdEarningsProvider(BaseEarningsProvider):
         *,
         end_date: date | None = None,
         overlap_days: int = 7,
+        no_cache_window_days: int = 365,
         cache_root: Path | None = None,
         on_window: Callable[[int, int, date, date], None] | None = None,
     ) -> list[EarningsEvent]:
@@ -183,13 +184,16 @@ class EodhdEarningsProvider(BaseEarningsProvider):
         :func:`latest_report_date`; if there are cached rows, the
         effective ``start_date`` is ``latest - overlap_days`` (so late
         vendor updates within the overlap window are still picked up).
-        Symbols with no cache row fall back to a 1-year backfill.
+        Symbols with no cache row fall back to a ``no_cache_window_days``
+        day backfill (1 year by default; the CLI bumps this to 730).
 
         Args:
             symbols: Tickers to refresh.
             end_date: Inclusive upper bound (defaults to today).
             overlap_days: Days of overlap with the existing cache, to
                 catch late restatements / corrections.
+            no_cache_window_days: Backfill window for symbols with no
+                cache row. Defaults to 365.
             cache_root: Override the data root (for tests).
             on_window: Optional ``(idx, total, window_from, window_to) -> None``
                 callback invoked before each HTTP call across all symbols.
@@ -206,7 +210,11 @@ class EodhdEarningsProvider(BaseEarningsProvider):
         per_symbol_windows: list[tuple[str, date, date]] = []
         for code in canonical:
             latest = latest_report_date(code, root=cache_root)
-            start = end_date - timedelta(days=365) if latest is None else latest - timedelta(days=overlap_days)
+            start = (
+                end_date - timedelta(days=no_cache_window_days)
+                if latest is None
+                else latest - timedelta(days=overlap_days)
+            )
             if start > end_date:
                 # Cache is already past the requested end — nothing to do.
                 continue

@@ -428,6 +428,27 @@ def test_incremental_fetch_no_cache_uses_one_year_backfill(
     assert session.calls[0]["params"]["from"] == expected_start.isoformat()
 
 
+def test_incremental_fetch_no_cache_window_override(
+    monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
+) -> None:
+    """``no_cache_window_days`` overrides the default 1-year backfill window."""
+    monkeypatch.setattr(eodhd_mod, "_MIN_INTERVAL_SEC", 0.0)
+    today = date(2026, 1, 15)
+    expected_start = today - timedelta(days=730)
+    payload = {"type": "Earnings", "earnings": [_aapl_row("2025-12-15")]}
+    # 2 years chunks into ~25 monthly HTTP calls.
+    session = _MockSession([_MockResponse(200, payload) for _ in range(25)])
+    p = EodhdEarningsProvider(session=session)
+    p.incremental_fetch(
+        ["AAPL"],
+        end_date=today,
+        no_cache_window_days=730,
+        cache_root=tmp_optopsy_dir,
+    )
+    assert len(session.calls) == 25
+    assert session.calls[0]["params"]["from"] == expected_start.isoformat()
+
+
 def test_incremental_fetch_uses_cache_latest_minus_overlap(
     monkeypatch_api_key: None, monkeypatch: pytest.MonkeyPatch, tmp_optopsy_dir: Path
 ) -> None:

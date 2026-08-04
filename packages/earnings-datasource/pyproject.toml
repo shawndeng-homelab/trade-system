@@ -1,0 +1,32 @@
+[project]
+name = "earnings-datasource"
+version = "0.1.0"
+description = "Earnings calendar data source for optopsy-based options backtests (EODHD)."
+readme = "README.md"
+authors = [
+    { name = "ShawnDeng-code", email = "shawndeng1109@qq.com" }
+]
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.12, <3.14.99"
+dependencies = [
+    "pandas>=2.0",
+    "pyarrow>=14",
+    "pydantic>=2,<3",
+    "requests<3",
+    "rich>=13,<14",
+]
+
+[project.optional-dependencies]
+optopsy = [
+    "optopsy[data]>=2.3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# `optopsy` is optional. The `DataProvider` adapter in `entry_point.py`
+# imports optopsy at *plugin load* time; if optopsy is not installed the
+# entry point silently returns a no-op class so other tools keep working.
+[project.entry-points."optopsy.providers"]
+earnings_eodhd = "earnings_datasource.entry_point:register"

@@ -40,3 +40,11 @@ changelog_path = "packages/backtest-charts/CHANGELOG.md"
 pre_bump_hooks = [
     "uv version --package backtest-charts {{version}}",
 ]
+
+[packages.earnings-datasource]
+path = "packages/earnings-datasource"
+public_api = true
+changelog_path = "packages/earnings-datasource/CHANGELOG.md"
+pre_bump_hooks = [
+    "uv version --package earnings-datasource {{version}}",
+]

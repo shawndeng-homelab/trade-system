@@ -9,7 +9,11 @@ Data must be pre-downloaded via the ``optopsy-data`` CLI::
     optopsy-data download SPY -s                       # stock OHLCV
 """
 
+from datetime import date as date_cls
+
 import optopsy as op
+
+from options_strategies.earnings_overnight.signals import load_earnings_calendar
 
 
 def load_pmcc_data(
@@ -105,3 +109,37 @@ def load_odte_data(
     options = op.load_cached_options(symbol, start_date, end_date)
     stock = op.load_cached_stocks(symbol, start_date, end_date)
     return options, stock
+
+
+def load_earnings_overnight_data(
+    symbol: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    as_of_date: date_cls | None = None,
+) -> tuple:
+    """Load options, stock, and earnings calendar for the earnings-overnight strategy.
+
+    The earnings cache lives at ``$OPTOPSY_DATA_DIR/cache/earnings/`` and
+    is populated by the ``earnings-data`` CLI::
+
+        earnings-data download --symbols SPY
+
+    Args:
+        symbol: Ticker symbol (e.g. "SPY"). Normalized to vendor-native
+            form (e.g. "SPY.US") before reading the cache.
+        start_date: Optional start date (YYYY-MM-DD) for options/stock.
+        end_date: Optional end date (YYYY-MM-DD) for options/stock.
+        as_of_date: Optional backtest cutoff; events with ``report_date``
+            after this are filtered out (prevents peeking at EODHD's
+            pre-published future events). Pass ``date.today()`` for a
+            point-in-time backtest.
+
+    Returns:
+        ``(options_df, stock_df, earnings_calendar)`` tuple. The
+        ``earnings_calendar`` is a ``{code: [report_dates]}`` dict that
+        can be passed directly to :func:`run_earnings_overnight`.
+    """
+    options = op.load_cached_options(symbol, start_date, end_date)
+    stock = op.load_cached_stocks(symbol, start_date, end_date)
+    earnings = load_earnings_calendar([symbol], as_of_date=as_of_date)
+    return options, stock, earnings

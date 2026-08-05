@@ -7,6 +7,11 @@ leg only ever sees one row per (symbol, date) — optopsy's
 0.01, 0.99)`` accepts any delta) and the actual strike selection is
 done by our custom logic.
 
+Three position shapes are supported via ``config.structure``:
+``"single"`` (one directional leg), ``"strangle"`` (both 2 % OTM legs),
+and ``"straddle"`` (both ATM legs). See ``config.py`` for the
+trade-offs.
+
 Known limitations (see CLAUDE.md and the strategy docstring):
 
 - The "3:30 PM entry" is approximated by the **T-1 daily high** (the
@@ -17,8 +22,8 @@ Known limitations (see CLAUDE.md and the strategy docstring):
 - The "T open exit" is approximated by the **T EOD** snapshot. The
   intraday move from open to close is not captured.
 - The ``$1000`` cost cap is enforced by dropping events whose top
-  candidate exceeds the cap (no entry, no quantity rescaling, no
-  fallback to the lower-score side).
+  candidate (or combined two-leg debit) exceeds the cap — no entry, no
+  quantity rescaling, no fallback to a cheaper structure.
 """
 
 import optopsy as op
@@ -51,11 +56,21 @@ def run_earnings_overnight(
 
     1. Map each earnings report date to its T-1 (entry) and T (exit)
        trading day, given the stock's trading calendar.
-    2. Pre-select the 2 % OTM call/put candidate with the highest
-       OI × Volume per event. Filter by ``min_oi``, ``min_volume``,
-       ``max_entry_dte``, and ``cost_cap_usd``.
-    3. Split the pre-selected rows into per-side filtered options_dfs
-       (one call row, one put row, or neither per event).
+    2. Pre-select the option(s) per event according to
+       ``config.structure``:
+
+       - ``"single"`` — the 2 % OTM call **or** put, whichever has the
+         higher OI × Volume (a directional bet on the side institutions
+         are crowding into).
+       - ``"strangle"`` — **both** 2 % OTM legs (非方向性; profits on a
+         large move either way, costs ~2× a single leg).
+       - ``"straddle"`` — **both** ATM legs (highest premium and gamma;
+         frequently busts ``cost_cap_usd``).
+
+       All variants filter by ``min_oi``, ``min_volume``,
+       ``max_entry_dte``, and ``cost_cap_usd`` (the cap applies to the
+       combined debit for two-leg structures).
+    3. Split the pre-selected rows into per-side filtered options_dfs.
     4. Dispatch each non-empty side to ``optopsy.simulate_portfolio``
        as a separate leg. The leg's ``entry_dates`` is the unique
        ``(symbol, quote_date)`` pairs in that side's filtered df; its
@@ -124,13 +139,13 @@ def run_earnings_overnight(
         "multiplier": config.multiplier,
         "max_positions": config.max_positions,
         "max_entry_dte": config.max_entry_dte,
-        # ``exit_dte`` is optopsy's "exit when DTE drops to this value".
-        # With the pre-filtered options_df containing only the pre-selected
-        # strike + expiration, ``exit_dte=0`` is the most natural "hold to
-        # the data's last available snapshot" exit. For multi-day options
-        # the pre-filtered df's last row approximates the post-earnings
-        # T-day EOD price (the EOD proxy for the user's "9:30 AM open exit").
-        "exit_dte": 0,
+        # ``exit_dte=1`` (not 0) because EODHD's daily feed routinely omits
+        # the DTE=0 (expiration-day) row. With ``exit_dte=0`` optopsy can't
+        # find an exit row and silently drops every trade. Exiting at DTE=1
+        # is also the closer match to this strategy's intent: hold overnight
+        # through the announcement, then close — not hold to expiry.
+        "exit_dte": config.exit_dte,
+        "exit_dte_tolerance": config.exit_dte_tolerance,
         "leg1_delta": _NOOP_DELTA,
     }
 

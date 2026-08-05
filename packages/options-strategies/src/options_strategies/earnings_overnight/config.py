@@ -42,7 +42,22 @@ class EarningsOvernightConfig(BaseModel):
         max_positions: Maximum concurrent open positions per leg.
         start_date: Optional start date filter (YYYY-MM-DD).
         end_date: Optional end date filter (YYYY-MM-DD).
-        otm_target_pct: Target OTM percentage (0.02 = 2% OTM).
+        structure: Position shape.
+
+            - ``"single"`` — one leg only: the 2% OTM call **or** put,
+              whichever has the higher OI × Volume. Directional bet.
+            - ``"strangle"`` — **both** the 2% OTM call and the 2% OTM
+              put (宽跨式). Non-directional; profits on a large move
+              either way. Costs roughly 2× a single leg.
+            - ``"straddle"`` — **both** the ATM call and ATM put
+              (跨式). Highest premium, highest gamma. Frequently busts
+              ``cost_cap_usd`` on higher-priced underlyings.
+
+            For the two-leg structures the cost cap applies to the
+            **combined** debit, and the event is skipped unless *both*
+            legs clear the liquidity filters.
+        otm_target_pct: Target OTM percentage (0.02 = 2% OTM). Ignored
+            when ``structure="straddle"`` (which targets ATM).
         otm_tolerance_pct: ± strike tolerance band around the target.
         reference_price: Which T-1 OHLCV field anchors the strike.
             ``"high"`` is the closest EOD proxy for a 3:30 PM price.
@@ -50,9 +65,16 @@ class EarningsOvernightConfig(BaseModel):
         min_volume: Minimum volume for a candidate to qualify.
         max_entry_dte: DTE upper bound (forces "nearest expiry" semantics).
         min_entry_dte: DTE lower bound (allow 0DTE entries).
+        exit_dte: DTE at which to exit. Defaults to 1 (not 0) because
+            EODHD's daily feed routinely omits the DTE=0
+            (expiration-day) row; with ``exit_dte=0`` optopsy can't find
+            an exit row and silently drops every trade.
+        exit_dte_tolerance: Tolerance for exit-DTE matching. Defaults to
+            1 so a missing DTE=1 row can still exit at DTE=0 or 2.
         cost_cap_usd: Maximum debit per position. Events whose top
             candidate exceeds this are skipped (no entry, no quantity
-            rescaling).
+            rescaling). For ``strangle`` / ``straddle`` this applies to
+            the **combined** two-leg debit.
         call_weight: Capital weight for the call leg.
         put_weight: Capital weight for the put leg.
         as_of_date: Optional backtest cutoff. Filters out earnings events
@@ -76,6 +98,7 @@ class EarningsOvernightConfig(BaseModel):
     as_of_date: date_cls | None = None
 
     # ── Strike selection ───────────────────────────────────────────────────
+    structure: Literal["single", "strangle", "straddle"] = "single"
     otm_target_pct: float = Field(0.02, gt=0, lt=1)
     otm_tolerance_pct: float = Field(0.005, gt=0, lt=1)
     reference_price: Literal["high", "close"] = "high"
@@ -87,6 +110,10 @@ class EarningsOvernightConfig(BaseModel):
     # ── Expiration ─────────────────────────────────────────────────────────
     max_entry_dte: int = Field(14, gt=0)
     min_entry_dte: int = Field(0, ge=0)
+
+    # ── Exit ───────────────────────────────────────────────────────────────
+    exit_dte: int = Field(1, ge=0)
+    exit_dte_tolerance: int = Field(1, ge=0)
 
     # ── Cost cap ───────────────────────────────────────────────────────────
     cost_cap_usd: float = Field(1000.0, gt=0)

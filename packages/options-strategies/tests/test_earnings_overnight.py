@@ -113,6 +113,15 @@ def test_earnings_config_otm_tolerance_ordering() -> None:
         EarningsOvernightConfig(otm_target_pct=0.02, otm_tolerance_pct=0.05)
 
 
+def test_earnings_config_structure_default_and_validation() -> None:
+    """Structure defaults to "single" and rejects unknown values."""
+    assert EarningsOvernightConfig().structure == "single"
+    for s in ("single", "strangle", "straddle"):
+        assert EarningsOvernightConfig(structure=s).structure == s
+    with pytest.raises(ValidationError):
+        EarningsOvernightConfig(structure="butterfly")  # type: ignore[arg-type]
+
+
 def test_api_aliases_match() -> None:
     """Top-level re-exports point to the same objects as the submodules."""
     assert EarningsOvernightConfig is ConfigDirect
@@ -443,6 +452,95 @@ def test_select_options_reference_price_close() -> None:
     # close=100 → same targets as the high-based test, so same winners.
     first = selected[selected["quote_date"] == pd.Timestamp("2024-02-02")].iloc[0]
     assert first["option_type"] == "c"
+
+
+# ── structure="strangle" / "straddle" tests ───────────────────────────────
+
+
+def test_select_options_strangle_takes_both_otm_legs() -> None:
+    """structure='strangle' selects the 2% OTM call AND put per event."""
+    options_df, stock, events = _two_event_setup()
+    config = EarningsOvernightConfig(structure="strangle")
+    selected = select_options_for_events(options_df, stock, events, config)
+    # Two events × two legs = 4 rows (vs 2 for structure="single")
+    assert len(selected) == 4
+    for entry in (pd.Timestamp("2024-02-02"), pd.Timestamp("2024-02-09")):
+        legs = selected[selected["quote_date"] == entry]
+        assert set(legs["option_type"]) == {"c", "p"}
+        # 2% OTM around ref=100 → call at 102, put at 98
+        assert set(legs["strike"]) == {102.0, 98.0}
+
+
+def test_select_options_strangle_skips_when_one_leg_missing() -> None:
+    """structure='strangle' drops the event if either leg fails its filters."""
+    options_df, stock, events = _two_event_setup()
+    # Kill the put side's liquidity on event 1 only
+    mask = (options_df["quote_date"] == pd.Timestamp("2024-02-02")) & (options_df["option_type"] == "p")
+    options_df.loc[mask, "open_interest"] = 1
+    config = EarningsOvernightConfig(structure="strangle")
+    selected = select_options_for_events(options_df, stock, events, config)
+    # Event 1 dropped entirely (no half-strangle); event 2 still gives 2 legs
+    assert len(selected) == 2
+    assert (selected["quote_date"] == pd.Timestamp("2024-02-09")).all()
+
+
+def test_select_options_strangle_cost_cap_is_combined() -> None:
+    """The cost cap applies to the SUM of both strangle legs."""
+    options_df, stock, events = _two_event_setup()
+    # Event 1 legs: call ask 1.5 + put ask 1.8 = 3.3 → $330 combined.
+    # A $200 cap kills it even though each leg alone is under $200.
+    config = EarningsOvernightConfig(structure="strangle", cost_cap_usd=200.0)
+    selected = select_options_for_events(options_df, stock, events, config)
+    assert selected[selected["quote_date"] == pd.Timestamp("2024-02-02")].empty
+    # A $400 cap lets event 1 through
+    config = EarningsOvernightConfig(structure="strangle", cost_cap_usd=400.0)
+    selected = select_options_for_events(options_df, stock, events, config)
+    assert len(selected[selected["quote_date"] == pd.Timestamp("2024-02-02")]) == 2
+
+
+def test_select_options_straddle_targets_atm() -> None:
+    """structure='straddle' targets ATM strikes, not 2% OTM."""
+    # ref = 100; add ATM (100) legs alongside the existing 102/98 rows.
+    options_df, stock, events = _two_event_setup()
+    exp = pd.Timestamp("2024-02-16")
+    atm = _synthetic_options_chain(
+        "TEST.US",
+        pd.Timestamp("2024-02-02"),
+        rows=[
+            {"opt_type": "c", "strike": 100, "ask": 3.0, "oi": 500, "vol": 500, "expiration": exp},
+            {"opt_type": "p", "strike": 100, "ask": 3.2, "oi": 500, "vol": 500, "expiration": exp},
+        ],
+    )
+    options_df = pd.concat([options_df, atm], ignore_index=True)
+    config = EarningsOvernightConfig(structure="straddle", cost_cap_usd=1000.0)
+    selected = select_options_for_events(options_df, stock, events, config)
+    legs = selected[selected["quote_date"] == pd.Timestamp("2024-02-02")]
+    assert len(legs) == 2
+    # Both legs at the ATM strike, not the 2% OTM strikes
+    assert set(legs["strike"]) == {100.0}
+    assert set(legs["option_type"]) == {"c", "p"}
+
+
+def test_run_earnings_overnight_strangle_fires_both_legs() -> None:
+    """A strangle backtest produces both a call leg and a put leg."""
+    options_df = _full_options_for_two_events()
+    stock = pd.DataFrame(
+        {
+            "underlying_symbol": ["TEST.US"] * 14,
+            "quote_date": pd.date_range("2024-02-01", "2024-02-20", freq="B"),
+            "open": 100.0,
+            "high": 100.0,
+            "low": 100.0,
+            "close": 100.0,
+            "volume": 1_000_000,
+        }
+    )
+    cal = {"TEST.US": [pd.Timestamp("2024-02-05"), pd.Timestamp("2024-02-12")]}
+    config = EarningsOvernightConfig(structure="strangle")
+    result = run_earnings_overnight(options_df, stock, cal, config)
+    # Both sides are held, so both legs must exist
+    assert "earnings_call" in result.leg_results
+    assert "earnings_put" in result.leg_results
 
 
 # ── End-to-end strategy tests ─────────────────────────────────────────────

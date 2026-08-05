@@ -216,28 +216,38 @@ def select_options_for_events(
     earnings_events: pd.DataFrame,
     config: EarningsOvernightConfig,
 ) -> pd.DataFrame:
-    """For each event, select the top-scoring 2% OTM option (call or put).
+    """Select the option(s) to trade for each earnings event.
 
-    The result is a filtered ``options_df`` with at most one row per
-    event. Events that fail the OI/Volume thresholds or whose top
-    candidate's cost exceeds ``cost_cap_usd`` are silently dropped.
+    The shape of the result depends on ``config.structure``:
+
+    - ``"single"`` — at most **one** row per event: the 2% OTM call or
+      put, whichever has the higher OI × Volume score.
+    - ``"strangle"`` — at most **two** rows per event: the 2% OTM call
+      *and* the 2% OTM put. The event is skipped unless both legs clear
+      the filters.
+    - ``"straddle"`` — at most **two** rows per event: the ATM call
+      *and* the ATM put. Same both-legs-or-nothing rule.
+
+    Events are silently dropped when a required leg fails the
+    OI / Volume / DTE / ask filters, or when the (combined, for two-leg
+    structures) debit exceeds ``cost_cap_usd``.
 
     Algorithm (per event):
 
     1. Pick the T-1 reference price from ``stock_df`` (default
        ``config.reference_price="high"``; falls back to ``close``).
-    2. Compute ``call_target = ref * (1 + otm)`` and
-       ``put_target = ref * (1 - otm)`` with a ``± tol`` strike band.
+    2. Compute the per-side strike targets. For ``single`` / ``strangle``
+       that's ``ref * (1 ± otm_target_pct)``; for ``straddle`` both
+       targets are ``ref`` itself. Both use a ``± tol`` band.
     3. Filter ``options_df`` to that event's
        ``(symbol, quote_date == entry_date)`` slice.
     4. For each side, pick the top-scoring candidate inside the strike
        band, subject to ``min_oi``, ``min_volume``, ``dte <= max_dte``,
        and ``ask > 0``.
-    5. Pick the side with the higher OI×Volume score (the other side
-       loses). Tie-break: smaller strike distance from target; final tie
-       defaults to call.
-    6. Compute ``cost = ask * multiplier * quantity``; drop the event if
-       it exceeds ``cost_cap_usd``.
+    5. For ``single``, keep the side with the higher OI × Volume score.
+       For the two-leg structures, require both sides.
+    6. Compute the debit (summed across legs) and drop the event if it
+       exceeds ``cost_cap_usd``.
     """
     if earnings_events.empty:
         return options_df.iloc[0:0].copy()
@@ -267,8 +277,12 @@ def select_options_for_events(
         if ref_price is None or ref_price <= 0:
             continue
 
-        call_target = ref_price * (1.0 + config.otm_target_pct)
-        put_target = ref_price * (1.0 - config.otm_target_pct)
+        # Straddle targets ATM on both sides; single/strangle go 2% OTM.
+        if config.structure == "straddle":
+            call_target = put_target = ref_price
+        else:
+            call_target = ref_price * (1.0 + config.otm_target_pct)
+            put_target = ref_price * (1.0 - config.otm_target_pct)
         tol = ref_price * config.otm_tolerance_pct
 
         chain = by_sym_date.get((sym, entry_date))
@@ -282,16 +296,31 @@ def select_options_for_events(
             chain, "p", put_target, tol, config.min_oi, config.min_volume, config.max_entry_dte
         )
 
-        winner = _pick_winner(call_pick, put_pick, call_target, put_target)
-        if winner is None:
-            continue
+        if config.structure == "single":
+            winner = _pick_winner(call_pick, put_pick, call_target, put_target)
+            if winner is None:
+                continue
+            legs = [winner]
+        else:
+            # strangle / straddle: both legs or nothing
+            if call_pick is None or put_pick is None:
+                logger.debug(
+                    "Skipping %s event %s entry %s: missing a leg (call=%s put=%s)",
+                    config.structure,
+                    sym,
+                    entry_date.date(),
+                    call_pick is not None,
+                    put_pick is not None,
+                )
+                continue
+            legs = [call_pick, put_pick]
 
-        # Cost cap (skip if it would bust the budget)
-        ask = float(winner.get("ask", 0) or 0)
-        cost = ask * config.multiplier * config.quantity
+        # Cost cap on the COMBINED debit (skip if it would bust the budget)
+        cost = sum(float(leg.get("ask", 0) or 0) for leg in legs) * config.multiplier * config.quantity
         if cost > config.cost_cap_usd:
             logger.debug(
-                "Skipping event %s entry %s: cost %.2f exceeds cap %.2f",
+                "Skipping %s event %s entry %s: cost %.2f exceeds cap %.2f",
+                config.structure,
                 sym,
                 entry_date.date(),
                 cost,
@@ -299,7 +328,7 @@ def select_options_for_events(
             )
             continue
 
-        selected_rows.append(winner)
+        selected_rows.extend(legs)
 
     if not selected_rows:
         return options_df.iloc[0:0].copy()

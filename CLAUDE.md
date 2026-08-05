@@ -55,14 +55,15 @@ Each strategy lives in its own subpackage split into three files — **`config.p
 **BacktestReport** OOP API wraps a duck-typed result object, pre-extracts validated data into `BacktestData` (frozen dataclass), and provides chart methods + per-instance panel registry. Chart functions accept `BacktestData` instead of raw result objects, decoupling visualization from optopsy internals.
 
 - `data.py` — `BacktestData` + `LegData` frozen dataclasses; `from_result()` validates and normalizes data; `has_trades`/`has_equity` properties
-- `report.py` — `BacktestReport` class; `DEFAULT_PANELS` class-level registry; `plot_equity()`, `plot_cum_pnl()`, `plot_pnl_dist()`, `plot_exits()`, `plot_summary()`, `plot_dashboard()`, `save_html()`; `@report.panel()` decorator for custom panels
+- `report.py` — `BacktestReport` class; `DEFAULT_PANELS` class-level registry; `plot_equity()`, `plot_cum_pnl()`, `plot_pnl_dist()`, `plot_exits()`, `plot_summary()`, `plot_trades()`, `plot_dashboard()`, `save_html()`; `@report.panel()` decorator for custom panels
 - `equity.py` — equity curve with starting-capital reference line (`plot_equity(data)`)
 - `pnl.py` — cumulative P&L by leg + per-trade P&L distribution (`plot_cum_pnl(data)`, `plot_pnl_dist(data)`)
 - `exits.py` — exit-type count grouped by leg (`plot_exits(data)`)
 - `summary.py` — strategy metrics table via `go.Table` (`plot_summary(data)`)
+- `trades.py` — full trade log table via `go.Table` (`plot_trades(data)`)
 - `_util.py` — `_empty_chart()` placeholder for missing data
 
-Dashboard composition uses `make_subplots` with auto-detected `specs` (domain type for `go.Table` traces). Panel registry is per-instance (copied from `DEFAULT_PANELS`), eliminating global mutable state. Legacy function API (`plot_equity_curve`, etc.) preserved as `DeprecationWarning` wrappers. Tests use a pickled real `PortfolioResult` fixture at `tests/fixtures/portfolio_result.pkl` (regenerate instructions in `test_charts.py` docstring).
+Dashboard composition uses `make_subplots` with auto-detected `specs` (domain type for `go.Table` traces). Panel registry is per-instance (copied from `DEFAULT_PANELS`), eliminating global mutable state. **`trade_log` is deliberately NOT a default panel** — the table is too wide to stay readable in a half-width grid cell, so `plot_trades()` renders it standalone (add it back per-report with `report.add_panel("trade_log", plot_trades)`). Legacy function API (`plot_equity_curve`, etc.) preserved as `DeprecationWarning` wrappers. Tests use a pickled real `PortfolioResult` fixture at `tests/fixtures/portfolio_result.pkl` (regenerate instructions in `test_charts.py` docstring).
 
 ### Key patterns
 

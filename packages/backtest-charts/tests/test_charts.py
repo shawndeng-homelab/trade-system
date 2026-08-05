@@ -187,15 +187,33 @@ class TestBacktestReport:
         fig = report.plot_summary()
         assert isinstance(fig, go.Figure)
         assert len(fig.data) >= 1
-        # Should be a Table trace
-        assert isinstance(fig.data[0], go.Table)
 
-    def test_dashboard_has_6_panels(self) -> None:
-        """Dashboard includes all 6 default panels."""
+    def test_plot_trades_returns_table(self) -> None:
+        """plot_trades returns a standalone Table figure with one row per trade."""
+        report = _make_report()
+        fig = report.plot_trades()
+        assert isinstance(fig, go.Figure)
+        assert len(fig.data) == 1
+        table = fig.data[0]
+        assert isinstance(table, go.Table)
+        # One value list per displayed column, each as long as the trade log
+        n_trades = len(report.data.trade_log)
+        assert all(len(col) == n_trades for col in table.cells.values)
+
+    def test_plot_trades_max_height_override(self) -> None:
+        """plot_trades honours an explicit max_height."""
+        report = _make_report()
+        default_fig = report.plot_trades()
+        tall_fig = report.plot_trades(max_height=2000)
+        assert tall_fig.layout.height == 2000
+        assert default_fig.layout.height != 2000
+
+    def test_dashboard_has_default_panels(self) -> None:
+        """Dashboard includes all 5 default panels (trade_log is standalone)."""
         report = _make_report()
         fig = report.plot_dashboard()
         assert isinstance(fig, go.Figure)
-        # 6 panels: equity + cum_pnl + pnl_dist + exits + trade_log + summary
+        # 5 panels: equity + cum_pnl + pnl_dist + exits + summary
         assert len(fig.data) >= 5
 
     def test_dashboard_subplot_titles(self) -> None:
@@ -365,10 +383,11 @@ class TestPanelExtension:
         assert "exit_breakdown" in r2.list_panels()
 
     def test_list_panels_default(self) -> None:
-        """Default panels are registered in order."""
+        """Default panels are registered in order; trade_log is not one of them."""
         report = _make_report()
         keys = report.list_panels()
-        assert keys == ["equity_curve", "cumulative_pnl", "pnl_distribution", "exit_breakdown", "trade_log", "summary"]
+        assert keys == ["equity_curve", "cumulative_pnl", "pnl_distribution", "exit_breakdown", "summary"]
+        assert "trade_log" not in keys
 
 
 # ══════════════════════════════════════════════════════════════════════════

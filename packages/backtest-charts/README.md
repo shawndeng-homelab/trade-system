@@ -24,7 +24,12 @@ report.plot_pnl_dist()     # Per-trade P&L distribution (green/crimson bars)
 report.plot_exits()        # Exit type breakdown by leg
 report.plot_summary()      # Strategy metrics table
 
-# Full dashboard (2-column grid of all panels)
+# Full trade log — standalone, NOT in the dashboard grid (too wide to
+# stay readable in a half-width cell). Pass max_height to show more rows.
+report.plot_trades()
+report.plot_trades(max_height=1600)
+
+# Full dashboard (2-column grid of the 5 default panels)
 report.plot_dashboard()
 
 # Save to HTML
@@ -103,6 +108,17 @@ report.plot_dashboard()  # now includes your custom panel
 report.remove_panel("exit_breakdown")  # remove a default panel
 report.add_panel("custom", my_factory)  # add a panel programmatically
 report.list_panels()                    # list registered panel keys
+```
+
+The default dashboard panels are `equity_curve`, `cumulative_pnl`,
+`pnl_distribution`, `exit_breakdown`, and `summary`. The trade log is
+excluded on purpose — use `report.plot_trades()` for a full-size view, or
+put it back in the grid explicitly:
+
+```python
+from backtest_charts.trades import plot_trades
+
+report.add_panel("trade_log", plot_trades)
 ```
 
 ## Data Access

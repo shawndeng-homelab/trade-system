@@ -27,14 +27,18 @@ from backtest_charts.trades import plot_trades
 # Type alias for panel factory functions
 PanelFactory = typing.Callable[[BacktestData], go.Figure]
 
-# Class-level default panel registry (shared across instances)
+# Class-level default panel registry (shared across instances).
+#
+# ``trade_log`` is deliberately NOT here: it's a wide table that becomes
+# unreadable when squeezed into a dashboard grid cell. Render it full-size
+# with :meth:`BacktestReport.plot_trades` instead, or add it back to a
+# specific report with ``report.add_panel("trade_log", plot_trades)``.
 DEFAULT_PANELS: OrderedDict[str, PanelFactory] = OrderedDict(
     [
         ("equity_curve", plot_equity),
         ("cumulative_pnl", plot_cum_pnl),
         ("pnl_distribution", plot_pnl_dist),
         ("exit_breakdown", plot_exits),
-        ("trade_log", plot_trades),
         ("summary", plot_summary),
     ]
 )
@@ -94,6 +98,7 @@ class BacktestReport:
         report = BacktestReport(result, capital=100_000)
         report.plot_equity()       # go.Figure
         report.plot_dashboard()    # go.Figure
+        report.plot_trades()       # full trade log, standalone
         report.save_html()         # writes file
 
     Custom panels::
@@ -232,6 +237,30 @@ class BacktestReport:
         """Plot strategy summary metrics as a table."""
         return plot_summary(self._data)
 
+    def plot_trades(self, *, max_height: int | None = None) -> go.Figure:
+        """Plot the full trade log as a standalone table.
+
+        Not part of the default dashboard grid — the table is too wide to
+        stay readable in a half-width cell, so it gets its own full-size
+        figure. Call this directly in a notebook cell, or register it as
+        a dashboard panel with
+        ``report.add_panel("trade_log", plot_trades)`` if you want it
+        inline anyway.
+
+        Args:
+            max_height: Override the table height cap in pixels. The
+                default grows with row count up to 800px; pass a larger
+                value (or ``None`` for the default) when you want more
+                rows visible without scrolling.
+
+        Returns:
+            Plotly table figure with one row per trade.
+        """
+        fig = plot_trades(self._data)
+        if max_height is not None:
+            fig.update_layout(height=max_height)
+        return fig
+
     # ── Dashboard ─────────────────────────────────────────────────────
 
     def plot_dashboard(self, *, columns: int = 2) -> go.Figure:
@@ -246,6 +275,10 @@ class BacktestReport:
             ├─────────────────────┼──────────────────────┤
             │  Strategy Summary                           │
             └─────────────────────────────────────────────┘
+
+        The trade log is **not** in the default grid — it's a wide table
+        that turns unreadable in a half-width cell. Use
+        :meth:`plot_trades` for a full-size view.
 
         Panels are sourced from the instance panel registry.
         Add custom panels via :meth:`panel` or :meth:`add_panel`,

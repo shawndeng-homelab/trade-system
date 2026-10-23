@@ -89,7 +89,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
     Returns:
         Plotly table figure with strategy metrics.
     """
-    if not data.has_trades:
+    if not data.has_trades and not data.has_equity:
         return _empty_chart(_TITLE, "No trade data")
 
     summary = data.summary
@@ -108,7 +108,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
     header_values = ["<b>Metric</b>", "<b>Strategy</b>"]
     for key in all_benchmark_keys:
         # Use symbol name for legacy benchmark_* keys, label as-is for benchmark_summaries keys
-        header_values.append(f"<b>{key} ATM Call</b>")
+        header_values.append(f"<b>{key}</b>")
 
     # Build rows
     metric_names: list[str] = []
@@ -148,7 +148,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
                 fill_colors[bm_key].append(row_bg)
 
     # ── Benchmark rows: ATM call return ──────────────────────────────────
-    metric_names.append("<b>Benchmark (Rolling ATM Call)</b>")
+    metric_names.append("<b>Benchmark Returns</b>")
     strategy_values.append("")
     for bm_key in all_benchmark_keys:
         benchmark_values[bm_key].append("")
@@ -158,7 +158,9 @@ def plot_summary(data: BacktestData) -> go.Figure:
         fill_colors[bm_key].append(group_bg)
 
     for bm_key in all_benchmark_keys:
-        metric_names.append(f"  {bm_key} ATM Call Return")
+        metric_names.append(
+            f"  {bm_key} Return" if bm_key in benchmark_labels else f"  {bm_key} Buy-and-Hold ATM Call Return"
+        )
         strategy_values.append("—")
         for other_key in all_benchmark_keys:
             if other_key == bm_key:
@@ -174,6 +176,18 @@ def plot_summary(data: BacktestData) -> go.Figure:
         fill_colors["strategy"].append(row_bg)
         for s in all_benchmark_keys:
             fill_colors[s].append(row_bg)
+
+    if data.has_equity:
+        start, end = data.equity_curve.index[[0, -1]]
+        metric_names.extend(["Comparison start", "Comparison end"])
+        strategy_values.extend([start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")])
+        fill_colors["name"].extend([row_bg, row_bg])
+        fill_colors["strategy"].extend([row_bg, row_bg])
+        for key in all_benchmark_keys:
+            benchmark_values[key].extend(
+                [start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")] if key in benchmark_labels else ["—", "—"]
+            )
+            fill_colors[key].extend([row_bg, row_bg])
 
     # Assemble cells
     cells_values = [metric_names, strategy_values] + [benchmark_values[key] for key in all_benchmark_keys]
@@ -201,7 +215,7 @@ def plot_summary(data: BacktestData) -> go.Figure:
         )
     )
     # Extra height for benchmark section
-    table_height = 580 + len(all_benchmark_keys) * 28
+    table_height = 90 + len(metric_names) * 24
     _apply_chart_layout(fig, _TITLE, height=table_height)
     fig.update_layout(margin={"l": 10, "r": 10, "t": 50, "b": 10})
     return fig

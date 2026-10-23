@@ -16,6 +16,7 @@ from optopsy.types import TargetRange
 
 from options_strategies.benchmark.config import BenchmarkConfig
 from options_strategies.benchmark.signals import benchmark_entry_dates
+from options_strategies.shared.results import correct_drawdown
 
 
 def run_benchmark(
@@ -71,4 +72,4 @@ def run_benchmark(
         }
         legs.append(leg)
 
-    return op.simulate_portfolio(legs, capital=config.capital)
+    return correct_drawdown(op.simulate_portfolio(legs, capital=config.capital), config.capital)

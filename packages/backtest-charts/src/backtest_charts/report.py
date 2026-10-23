@@ -14,9 +14,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from backtest_charts._util import DEFAULT_CAPITAL
+from backtest_charts.comparison import align_benchmarks
 from backtest_charts.data import BacktestData
 from backtest_charts.data import compute_benchmarks
 from backtest_charts.equity import plot_equity
+from backtest_charts.evaluation import diagnostic_table
+from backtest_charts.evaluation import evaluation_dashboard
+from backtest_charts.evaluation import make_evaluation_report
+from backtest_charts.evaluation import save_evaluation_html
 from backtest_charts.exits import plot_exits
 from backtest_charts.pnl import plot_cum_pnl
 from backtest_charts.pnl import plot_pnl_dist
@@ -54,30 +59,38 @@ def _propagate_layout(dash: go.Figure, panel_fig: go.Figure, row: int, col: int)
         row: Subplot row (1-based).
         col: Subplot column (1-based).
     """
-    ya = panel_fig.layout.yaxis
-    xa = panel_fig.layout.xaxis
+    for axis_name, update in (("xaxis", dash.update_xaxes), ("yaxis", dash.update_yaxes)):
+        axis = getattr(panel_fig.layout, axis_name).to_plotly_json()
+        # Domain, anchors and axis IDs belong to the destination grid.
+        properties = {
+            key: axis[key]
+            for key in (
+                "title",
+                "tickformat",
+                "ticksuffix",
+                "tickprefix",
+                "zeroline",
+                "visible",
+                "showgrid",
+                "type",
+                "range",
+                "autorange",
+            )
+            if key in axis
+        }
+        update(**properties, row=row, col=col)
 
-    # Y-axis formatting
-    if ya.tickformat:
-        dash.update_yaxes(tickformat=ya.tickformat, row=row, col=col)
-    if ya.zeroline is False:
-        dash.update_yaxes(zeroline=False, row=row, col=col)
-    if ya.title and ya.title.text:
-        dash.update_yaxes(title_text=ya.title.text, row=row, col=col)
-
-    # X-axis formatting
-    if xa.title and xa.title.text:
-        dash.update_xaxes(title_text=xa.title.text, row=row, col=col)
-    if xa.tickformat:
-        dash.update_xaxes(tickformat=xa.tickformat, row=row, col=col)
-
-    # Shapes (e.g. hlines from equity curve)
     for shape in panel_fig.layout.shapes or []:
         dash.add_shape(shape, row=row, col=col)
-
-    # Annotations (e.g. hline labels from equity curve)
     for ann in panel_fig.layout.annotations or []:
-        dash.add_annotation(ann, row=row, col=col)
+        props = ann.to_plotly_json()
+        # Empty-panel messages use paper coordinates in standalone figures.
+        # Convert them to coordinates local to the destination subplot.
+        if props.get("xref") == "paper":
+            props["xref"] = "x domain"
+        if props.get("yref") == "paper":
+            props["yref"] = "y domain"
+        dash.add_annotation(props, row=row, col=col)
 
 
 class BacktestReport:
@@ -114,6 +127,7 @@ class BacktestReport:
         benchmark_options: dict[str, "pd.DataFrame"] | None = None,
         stock_data: dict[str, "pd.DataFrame"] | None = None,
         benchmark_results: dict[str, object] | None = None,
+        benchmark_capitals: dict[str, float] | None = None,
     ) -> None:
         """Create a BacktestReport from a backtest result.
 
@@ -130,14 +144,19 @@ class BacktestReport:
                 ``bid``, ``ask``, ``delta``.
             stock_data: Optional mapping of symbol → stock OHLCV DataFrame.
                 When provided, the equity curve chart overlays each symbol's
-                close price on a secondary y-axis (log scale).  Each DataFrame
+                close return on the same percentage axis.  Each DataFrame
                 must have columns: ``quote_date``, ``close``.
             benchmark_results: Optional mapping of label → backtest result
                 object (duck-typed with ``equity_curve`` attribute).  When
                 provided, each result's equity curve is overlaid on the
                 equity chart as a dashed line (percentage change from start),
-                enabling visual comparison against benchmark strategies.
+                enabling visual comparison over a common observed interval.
+                Full-run trade metrics are omitted when that interval is clipped.
+            benchmark_capitals: Optional initial capital per benchmark. Otherwise
+                inferred from the trade ledger or final equity and total_return, falling back to the
+                first observation with a warning when neither is available.
         """
+        self._capital = capital
         self._data = BacktestData.from_result(result, capital)
         self._panels: OrderedDict[str, PanelFactory] = OrderedDict(DEFAULT_PANELS)
         self._title = title
@@ -152,53 +171,34 @@ class BacktestReport:
                 prices[sym] = sdf["close"]
             self._data.stock_prices.update(prices)
 
-        # Inject benchmark equity curves and summaries into BacktestData
         if benchmark_results:
-            bm_equity: dict[str, pd.Series] = {}
-            bm_summaries: dict[str, dict] = {}
-            for label, bm_result in benchmark_results.items():
-                ec = getattr(bm_result, "equity_curve", None)
-                if ec is not None and not ec.empty:
-                    ec = ec.copy()
-                    if not isinstance(ec.index, pd.DatetimeIndex):
-                        ec.index = pd.to_datetime(ec.index)
-                    bm_equity[label] = ec
-                bm_summary = getattr(bm_result, "summary", None)
-                if bm_summary and isinstance(bm_summary, dict):
-                    # Compute annualized return for benchmark
-                    bm_total_return = bm_summary.get("total_return")
-                    if bm_total_return is not None and not ec.empty:
-                        bm_start = pd.Timestamp(ec.index.min())
-                        bm_end = pd.Timestamp(ec.index.max())
-                        bm_years = (bm_end - bm_start).days / 365.25
-                        if bm_years > 0:
-                            bm_summary["annualized_return"] = (1 + bm_total_return) ** (1 / bm_years) - 1
-                    bm_summaries[label] = bm_summary
-            self._data.benchmark_equity.update(bm_equity)
-            self._data.benchmark_summaries.update(bm_summaries)
+            self._data = align_benchmarks(self._data, benchmark_results, benchmark_capitals or {})
 
-        # Compute benchmarks and inject into summary dict
-        if benchmark_options and self._data.has_trades:
-            tl = self._data.trade_log
-            start = pd.Timestamp(tl["entry_date"].min())
-            end = pd.Timestamp(tl["exit_date"].max())
-            benchmarks = compute_benchmarks(benchmark_options, start, end)
-            # Mutate the summary dict (BacktestData is frozen but summary is a dict)
-            self._data.summary.update(benchmarks)
+        if benchmark_options and self._data.has_equity:
+            start, end = self._data.equity_curve.index[[0, -1]]
+            self._data.summary.update(compute_benchmarks(benchmark_options, start, end))
 
-        # Compute annualized return and MAR ratio
-        if self._data.has_trades:
-            tl = self._data.trade_log
-            start = pd.Timestamp(tl["entry_date"].min())
-            end = pd.Timestamp(tl["exit_date"].max())
-            years = (end - start).days / 365.25
-            summary = self._data.summary
-            total_return = summary.get("total_return")
-            max_dd = summary.get("max_drawdown")
-            if years > 0 and total_return is not None:
-                summary["annualized_return"] = (1 + total_return) ** (1 / years) - 1
-            if total_return is not None and max_dd is not None and max_dd != 0:
-                summary["mar_ratio"] = total_return / abs(max_dd)
+    @classmethod
+    def from_evaluation(cls, evaluation, *, scope="full", scenario=None):
+        """Create a research report from an EvaluationResult-compatible object.
+
+        Scope is 'full' or 'common' (shared with stock price coverage). Cost
+        scenarios use fixed historical fills, not a re-run execution model.
+        """
+        return make_evaluation_report(cls, evaluation, scope=scope, scenario=scenario)
+
+    def plot_segments(self, *, kind="segment"):
+        """Plot year, quarter or equal-time diagnostics of an evaluation report."""
+        if not hasattr(self, "_evaluation_view"):
+            raise ValueError("plot_segments requires BacktestReport.from_evaluation")
+        return diagnostic_table(self._evaluation_view, kind)
+
+    def export_trades(self, path):
+        """Export all original completed trades, regardless of the display limit."""
+        if hasattr(self, "_evaluation_view"):
+            return self._evaluation_view.export_trades(path)
+        self.data.trade_log.to_csv(path, index=False)
+        return os.path.abspath(path)
 
     @property
     def data(self) -> BacktestData:
@@ -208,7 +208,7 @@ class BacktestReport:
     @property
     def capital(self) -> float:
         """Initial capital."""
-        return self._data.capital
+        return self._capital
 
     # ── Built-in chart methods ────────────────────────────────────────
 
@@ -257,6 +257,12 @@ class BacktestReport:
         Returns:
             Plotly figure with subplots.
         """
+        if hasattr(self, "_evaluation_view"):
+            return evaluation_dashboard(self._evaluation_view)
+        if isinstance(columns, bool) or not isinstance(columns, int) or columns < 1:
+            raise ValueError("columns must be a positive integer")
+        if not self._panels:
+            return go.Figure(layout={"title": self._title})
         # Build panels and detect subplot types in a single pass
         panel_data: list[tuple[str, go.Figure, bool]] = []
         for key, factory in self._panels.items():
@@ -282,11 +288,18 @@ class BacktestReport:
                     row_specs.append(None)
             specs.append(row_specs)
 
+        row_heights = [
+            max(float(fig.layout.height or 280) for _, fig, _ in panel_data[r * columns : (r + 1) * columns])
+            for r in range(rows)
+        ]
+        plot_height = sum(row_heights) + 24 * (rows - 1)
         dash = make_subplots(
             rows=rows,
             cols=columns,
             specs=specs,
             subplot_titles=subplot_titles,
+            row_heights=row_heights,
+            vertical_spacing=24 / plot_height if rows > 1 else 0,
         )
 
         for i, (_key, panel_fig, is_domain) in enumerate(panel_data):
@@ -300,7 +313,8 @@ class BacktestReport:
         dash.update_layout(
             title={"text": self._title, "x": 0.5},
             autosize=True,
-            height=280 * rows + 80,
+            height=plot_height + 80,
+            margin={"t": 60, "b": 20},
         )
         return dash
 
@@ -313,6 +327,8 @@ class BacktestReport:
         Returns:
             The absolute path to the written HTML file.
         """
+        if hasattr(self, "_evaluation_view"):
+            return save_evaluation_html(self, path)
         fig = self.plot_dashboard()
         out_abs = os.path.abspath(path)
         fig.write_html(out_abs, include_plotlyjs="cdn")

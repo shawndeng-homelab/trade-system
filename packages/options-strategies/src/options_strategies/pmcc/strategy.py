@@ -12,6 +12,7 @@ from optopsy.types import TargetRange
 from options_strategies.pmcc.config import PmccConfig
 from options_strategies.pmcc.signals import leaps_entry_dates
 from options_strategies.pmcc.signals import short_call_entry_dates
+from options_strategies.shared.results import correct_drawdown
 
 
 def run_pmcc(
@@ -86,7 +87,9 @@ def run_pmcc(
         short_leg["max_hold_days"] = config.short_max_hold_days
 
     # ── Run portfolio simulation ───────────────────────────────────────────
-    return op.simulate_portfolio(
+    result = op.simulate_portfolio(
         [leaps_leg, short_leg],
         capital=config.capital,
     )
+
+    return correct_drawdown(result, config.capital)

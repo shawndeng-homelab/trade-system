@@ -61,7 +61,7 @@ report.plot_summary()  # benchmark metrics shown side-by-side with strategy
 
 ### Stock Price Overlay
 
-Overlay underlying stock prices on a secondary y-axis:
+在同一个百分比坐标轴上叠加标的股票收益率：
 
 ```python
 report = BacktestReport(
@@ -136,3 +136,34 @@ plot_equity_curve(result, 100_000)  # DeprecationWarning
 - Python ≥ 3.12
 - plotly ≥ 5.0
 - pandas ≥ 2.0
+
+## 收益与比较口径
+
+报告复制输入数据；派生指标不会修改原始结果的汇总。
+权益回撤包含初始资金，MAR 为年化收益率除以最大回撤的绝对值。
+这些指标描述传入的权益曲线；optopsy 的已实现权益不是逐日盯市净值。
+
+策略和滚动基准曲线对齐到共同覆盖区间。权益图与汇总均使用该区间计算收益率，
+汇总会展示起止日期。曲线被裁剪时，不展示完整回测的交易与风险统计，
+以免误认为它们属于较短的比较区间。其他交易面板仍展示完整交易记录。
+如需完整回测指标，请另建不带基准的报告。
+
+可通过 `benchmark_capitals={"Rolling ATM Call": 100_000}` 指定各基准的初始资金。
+未指定时，先尝试从交易账本推断，再尝试使用期末权益和全期收益率推断。
+均不可用时，使用首个观测权益并发出警告。没有曲线的基准不参与展示；
+与策略区间不重叠的曲线会被忽略并发出警告；多个基准没有共同覆盖区间时抛出 `ValueError`。
+
+`report.capital` 保留调用方传入的初始资金；
+`report.data.capital` 为所展示比较区间的权益基准。
+单图与看板的百分比叠加曲线均共用 Y 轴。
+
+## PMCC 研究评估
+
+使用 `scripts/evaluate_pmcc.ipynb` 或 `uv run --all-packages python scripts/evaluate_pmcc.py`，
+比较 PMCC 与使用相同成交记录的 LEAPS-only 对照，并分析固定成交记录下的成本情景和历史时间分段。
+`BacktestReport.from_evaluation(evaluation)` 生成研究看板；
+`report.plot_segments(kind="quarter")` 生成所选区间的季度诊断。
+JSON/Parquet 结果和内嵌资源的 HTML 支持离线复核。
+
+计量单位、数据覆盖、复现方法和已实现权益的局限，详见
+[PMCC 评估口径](../../docs/strategies/pmcc-evaluation.md)。

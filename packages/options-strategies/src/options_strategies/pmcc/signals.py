@@ -68,7 +68,7 @@ def short_call_entry_dates(
         df["quote_date"] = pd.to_datetime(df["quote_date"])
         df = df.sort_values(["underlying_symbol", "quote_date"])
         df["_yw"] = df["quote_date"].dt.isocalendar().week.astype(int)
-        df["_yr"] = df["quote_date"].dt.year
+        df["_yr"] = df["quote_date"].dt.isocalendar().year.astype(int)
         first_of_week = df.groupby(["underlying_symbol", "_yr", "_yw"]).first().reset_index()
         return first_of_week[["underlying_symbol", "quote_date"]].reset_index(drop=True)
 

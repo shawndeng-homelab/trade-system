@@ -15,3 +15,5 @@
 .venv/
 .tmp/pmcc_dashboard.html
 .optopsy/cache/
+# Portable research runs and self-contained HTML reports
+.tmp/evaluations/

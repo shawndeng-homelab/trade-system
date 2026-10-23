@@ -10,6 +10,7 @@ nav:
   - Home: index.md
   - Strategies:
       - PMCC: strategies/option-management.md
+      - PMCC 评估口径: strategies/pmcc-evaluation.md
   - optopsy:
       - optopsy: optopsy/index.md
   - API Reference: reference/

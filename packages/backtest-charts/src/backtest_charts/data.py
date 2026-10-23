@@ -9,8 +9,12 @@ decoupling visualization from optopsy internals.
 """
 
 import dataclasses
+import math
+from copy import deepcopy
 
 import pandas as pd
+
+from backtest_charts.metrics import curve_metrics
 
 
 # ── Default benchmark symbols ──────────────────────────────────────────
@@ -33,7 +37,8 @@ def _normalize_equity_curve(ec: pd.Series | None) -> pd.Series:
     ec = ec.copy()
     if not isinstance(ec.index, pd.DatetimeIndex):
         ec.index = pd.to_datetime(ec.index)
-    return ec
+    ec = ec.sort_index(kind="stable")
+    return ec.groupby(level=0).last()
 
 
 def _normalize_trade_log(tl: pd.DataFrame | None) -> pd.DataFrame:
@@ -43,7 +48,7 @@ def _normalize_trade_log(tl: pd.DataFrame | None) -> pd.DataFrame:
 
 def _normalize_summary(summary: dict | None) -> dict:
     """Return a summary dict, or a minimal fallback if data is missing."""
-    return summary or {"total_trades": 0}
+    return deepcopy(summary) if summary is not None else {"total_trades": 0}
 
 
 # ── Data classes ──────────────────────────────────────────────────────
@@ -93,9 +98,11 @@ class BacktestData:
     benchmark_equity: dict[str, pd.Series]
     benchmark_summaries: dict[str, dict]
 
+    benchmark_capitals: dict[str, float] = dataclasses.field(default_factory=dict)
+
     def __post_init__(self) -> None:
         """Validate capital is positive."""
-        if self.capital <= 0:
+        if not math.isfinite(self.capital) or self.capital <= 0:
             msg = f"capital must be positive, got {self.capital}"
             raise ValueError(msg)
 
@@ -124,9 +131,19 @@ class BacktestData:
         Returns:
             Frozen ``BacktestData`` instance.
         """
+        if not math.isfinite(capital) or capital <= 0:
+            raise ValueError(f"capital must be positive, got {capital}")
         ec = _normalize_equity_curve(getattr(result, "equity_curve", None))
         tl = _normalize_trade_log(getattr(result, "trade_log", None))
         summary = _normalize_summary(getattr(result, "summary", None))
+
+        if not ec.empty:
+            if "entry_date" in tl and not tl.empty:
+                start = pd.to_datetime(tl["entry_date"]).min()
+                if start < ec.index.min():
+                    ec.loc[start] = capital
+                    ec = ec.sort_index()
+            summary.update(curve_metrics(ec, capital))
 
         raw_legs = getattr(result, "leg_results", None) or {}
         leg_names: list[str] = []

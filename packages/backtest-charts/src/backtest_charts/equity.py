@@ -1,7 +1,6 @@
 """Portfolio equity curve visualization with optional stock price overlay."""
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 from backtest_charts._util import _apply_chart_layout
 from backtest_charts._util import _empty_chart
@@ -21,9 +20,9 @@ def plot_equity(data: BacktestData) -> go.Figure:
     """Plot portfolio equity curve with a starting-capital reference line.
 
     When ``data.stock_prices`` is populated, each symbol's close price is
-    overlaid on a secondary y-axis as **percentage change from the start
+    overlaid on the same y-axis as **percentage change from the start
     of the backtest**.  Both the equity curve and stock prices are shown
-    as percentage change, so the two axes share the same scale and can
+    as percentage change, so all curves share the same scale and can
     be compared directly — e.g. "equity is up 5% while SPY is up 3%".
 
     Args:
@@ -31,7 +30,7 @@ def plot_equity(data: BacktestData) -> go.Figure:
 
     Returns:
         Plotly line chart of portfolio equity over time, with optional
-        stock price overlay on a secondary axis (both as % change).
+        stock price overlay (all as % change).
     """
     if not data.has_equity:
         return _empty_chart(_TITLE, "No equity curve data")
@@ -44,8 +43,7 @@ def plot_equity(data: BacktestData) -> go.Figure:
 
     has_stocks = bool(data.stock_prices)
     has_benchmarks = bool(data.benchmark_equity)
-    needs_secondary = has_stocks
-    fig = make_subplots(specs=[[{"secondary_y": True}]]) if needs_secondary else go.Figure()
+    fig = go.Figure()
 
     # Equity curve (primary y-axis, % change)
     fig.add_trace(
@@ -57,10 +55,9 @@ def plot_equity(data: BacktestData) -> go.Figure:
             name="Equity % Change",
             hovertemplate="Date: %{x|%Y-%m-%d}<br>Equity: %{y:+.1f}%<extra></extra>",
         ),
-        **({"secondary_y": False} if has_stocks else {}),
     )
 
-    # Stock price overlay (secondary y-axis, % change from start)
+    # Stock price overlay (shared percentage axis)
     if has_stocks:
         ec_start = ec.index.min()
         ec_end = ec.index.max()
@@ -83,7 +80,6 @@ def plot_equity(data: BacktestData) -> go.Figure:
                     name=f"{sym} % Change",
                     hovertemplate=f"{sym}: %{{y:+.1f}}%<extra></extra>",
                 ),
-                secondary_y=True,
             )
 
     # Benchmark equity overlay (primary y-axis, % change from start)
@@ -95,7 +91,7 @@ def plot_equity(data: BacktestData) -> go.Figure:
             if trimmed.empty:
                 continue
             # Normalize to % change from first value
-            base_value = trimmed.iloc[0]
+            base_value = data.benchmark_capitals.get(label, trimmed.iloc[0])
             if base_value <= 0:
                 continue
             bm_pct = (trimmed / base_value - 1) * 100
@@ -109,7 +105,6 @@ def plot_equity(data: BacktestData) -> go.Figure:
                     name=f"{label} % Change",
                     hovertemplate=f"{label}: %{{y:+.1f}}%<extra></extra>",
                 ),
-                **({"secondary_y": False} if needs_secondary else {}),
             )
 
     # Reference line at 0% (starting capital)
@@ -130,14 +125,6 @@ def plot_equity(data: BacktestData) -> go.Figure:
         yaxis_ticksuffix="%",
         yaxis_zeroline=False,
     )
-
-    if has_stocks:
-        fig.update_yaxes(
-            title_text="Stock % Change",
-            ticksuffix="%",
-            secondary_y=True,
-            showgrid=False,
-        )
 
     return fig
 

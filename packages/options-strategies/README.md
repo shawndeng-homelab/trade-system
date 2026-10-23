@@ -104,3 +104,20 @@ optopsy-data download IWM -s                       # stock OHLCV (optional)
 
 This package depends on optopsy (AGPL-3.0-or-later). If you distribute this software,
 you must comply with AGPL-3.0 terms.
+
+## 权益报告口径
+
+策略运行器修正 optopsy 的已实现最大回撤计算，将初始资金纳入基准，
+并在计算日度回撤前汇总同日平仓记录。组合与单腿汇总使用同一口径。
+这项修正不包含逐日盯市估值、购买力检查或 PMCC 长短腿联动，底层模拟模型保持不变。
+
+## PMCC 研究评估
+
+使用 `scripts/evaluate_pmcc.ipynb` 或 `uv run --all-packages python scripts/evaluate_pmcc.py`，
+比较 PMCC 与使用相同成交记录的 LEAPS-only 对照，并分析固定成交记录下的成本情景和历史时间分段。
+`BacktestReport.from_evaluation(evaluation)` 生成研究看板；
+`report.plot_segments(kind="quarter")` 生成所选区间的季度诊断。
+JSON/Parquet 结果和内嵌资源的 HTML 支持离线复核。
+
+计量单位、数据覆盖、复现方法和已实现权益的局限，详见
+[PMCC 评估口径](../../docs/strategies/pmcc-evaluation.md)。

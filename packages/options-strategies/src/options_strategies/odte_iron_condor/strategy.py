@@ -16,6 +16,7 @@ from optopsy.types import TargetRange
 
 from options_strategies.odte_iron_condor.config import OdteIronCondorConfig
 from options_strategies.odte_iron_condor.signals import odte_entry_dates
+from options_strategies.shared.results import correct_drawdown
 
 
 def run_odte_iron_condor(
@@ -99,4 +100,4 @@ def run_odte_iron_condor(
         legs.append(leg)
 
     # ── Run portfolio simulation ───────────────────────────────────────
-    return op.simulate_portfolio(legs, capital=config.capital)
+    return correct_drawdown(op.simulate_portfolio(legs, capital=config.capital), config.capital)

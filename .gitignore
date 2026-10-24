@@ -17,3 +17,4 @@
 .optopsy/cache/
 # Portable research runs and self-contained HTML reports
 .tmp/evaluations/
+.tmp/simulations/

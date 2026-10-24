@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "start_date": "2024-01-02",
+  "end_date": "2024-01-31",
+  "seed": 42,
+  "n_paths": 1,
+  "chunk_sessions": 5,
+  "symbols": [
+    {
+      "symbol": "SPY",
+      "initial_price": 100.0,
+      "mu": 0.05,
+      "realized_volatility": 0.18,
+      "implied_volatility": 0.22,
+      "strike_step": 5.0,
+      "multiplier": 100
+    },
+    {
+      "symbol": "QQQ",
+      "initial_price": 100.0,
+      "mu": 0.06,
+      "realized_volatility": 0.24,
+      "implied_volatility": 0.28,
+      "strike_step": 5.0,
+      "multiplier": 100
+    }
+  ],
+  "correlation": [[1.0, 0.8], [0.8, 1.0]],
+  "pricing": {
+    "risk_free_rate": 0.04,
+    "time_grid": 200,
+    "price_grid": 400,
+    "damping_steps": 2,
+    "max_refinements": 2
+  },
+  "chain": {
+    "weekly_expirations": 2,
+    "monthly_expirations": 3,
+    "strike_lower": 0.7,
+    "strike_upper": 1.3
+  },
+  "quotes": {
+    "minimum_spread": 0.1,
+    "relative_spread": 0.02,
+    "tick_size": 0.01
+  },
+  "events": [],
+  "cash_dividends": []
+}

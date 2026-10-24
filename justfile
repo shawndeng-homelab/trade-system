@@ -124,6 +124,34 @@ download-stocks symbol="SPY":
 # Download both options and stock data for a symbol (default: SPY)
 download symbol="SPY": (download-options symbol) (download-stocks symbol)
 
+# 查看合成行情 CLI 的富文本帮助
+sim-help:
+    uv run --package options-strategies simulate-market --help
+
+# 按配置生成合成行情，默认使用快速基线示例
+sim-generate config="examples/simulation/baseline.json" output=".tmp/simulations/baseline":
+    uv run --package options-strategies simulate-market generate --config {{quote(config)}} --output {{quote(output)}}
+
+# 恢复相同配置的数据集，跳过已完成路径
+sim-resume config="examples/simulation/baseline.json" output=".tmp/simulations/baseline":
+    uv run --package options-strategies simulate-market generate --config {{quote(config)}} --output {{quote(output)}} --resume
+
+# 校验文件摘要、行情边界和合约报价覆盖
+sim-validate input=".tmp/simulations/baseline":
+    uv run --package options-strategies simulate-market validate --input {{quote(input)}}
+
+# 查看配置、生成版本和路径状态
+sim-inspect input=".tmp/simulations/baseline":
+    uv run --package options-strategies simulate-market inspect --input {{quote(input)}}
+
+# 测量数据源耗时、峰值内存及落盘大小
+sim-benchmark config="examples/simulation/baseline.json" output=".tmp/simulations/benchmark" paths="1":
+    uv run --package options-strategies python scripts/benchmark_simulation.py --config {{quote(config)}} --output {{quote(output)}} --paths {{quote(paths)}}
+
+# 运行合成行情的数据质量与 CLI 回归测试
+sim-test:
+    uv run --all-packages --group dev pytest -q packages/options-strategies/tests/test_simulation.py
+
 # Add a new package to the workspace (skeleton + cog.toml + sync)
 add-package name:
     uvx repo-scaffold@latest add-package {{name}}

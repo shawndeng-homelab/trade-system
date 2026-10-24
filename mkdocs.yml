@@ -13,6 +13,9 @@ nav:
       - PMCC 评估口径: strategies/pmcc-evaluation.md
   - optopsy:
       - optopsy: optopsy/index.md
+  - 数据源:
+      - 蒙特卡洛合成行情: monte-carlo-data-source.md
+      - 首版验收记录: simulation-validation.md
   - API Reference: reference/
 plugins:
   - search

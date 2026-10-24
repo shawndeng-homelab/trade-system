@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "start_date": "2024-01-02",
+  "end_date": "2024-12-31",
+  "seed": 42,
+  "n_paths": 1,
+  "chunk_sessions": 5,
+  "symbols": [
+    {
+      "symbol": "SPY",
+      "initial_price": 100.0,
+      "mu": 0.0,
+      "realized_volatility": 0.0,
+      "implied_volatility": 0.25
+    },
+    {
+      "symbol": "QQQ",
+      "initial_price": 100.0,
+      "mu": 0.0,
+      "realized_volatility": 0.0,
+      "implied_volatility": 0.25
+    }
+  ],
+  "correlation": [[1.0, 0.8], [0.8, 1.0]],
+  "pricing": {"risk_free_rate": 0.04}
+}
